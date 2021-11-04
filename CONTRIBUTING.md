@@ -3,8 +3,8 @@
 PRs are welcomed! To get started developing:
 1. Install Node.js and NPM
 2. Install dependencies with `npm install`
-3. Run `npm run test` to run tests with Jest
-4. Build with `npm run build`
+3. Run `npm start` to run the server
+4. Run `npm test` to run tests with Jest
 
 ## Releases
 

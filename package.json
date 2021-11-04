@@ -13,6 +13,7 @@
     "dist"
   ],
   "scripts": {
+    "start": "npm run build && node dist/cli.js",
     "pretest": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -2,6 +2,8 @@
 
 A local version of Amazon Simple Email Service (AWS SES) supporting the [V2 API](https://docs.aws.amazon.com/ses/latest/APIReference-V2/Welcome.html). Currently focuses on the SendEmail endpoint.
 
+Are you using serverless-offline? You might be interested in [serverless-offline-ses-v2](https://github.com/domdomegg/serverless-offline-ses-v2).
+
 ![Screenshot of the email viewer tool](./screenshot.png)
 
 ## Install
@@ -53,7 +55,7 @@ const data = await sesClient.send(command)
 Or with the V2 SDK:
 
 ```typescript
-import { SESv2Client, SendEmailCommand, SendEmailCommandInput } from "@aws-sdk/client-sesv2"
+import AWS from 'aws-sdk'
 
 const sesClient = new AWS.SESV2({ endpoint: "http://localhost:8005" })
 const params = {
