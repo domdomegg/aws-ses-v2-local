@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>aws-ses-v2-local viewer</title>
+    <style>
+        html {
+            font-family: sans-serif;
+            margin: 1em 2em 2em 2em;
+        }
+
+        .email {
+            border: 1px solid #ccc;
+            border-radius: 0.5em;
+            padding: 1em;
+            margin-bottom: 1em;
+            box-shadow: 1.2px 1.2px 1.8px rgb(0 0 0 / 4%), 4px 4px 4px rgb(0 0 0 / 7%);
+        }
+
+        .email p {
+            margin: 0.1em;
+        }
+
+        .email p:first-of-type {
+            font-size: 125%;
+            margin-top: 0;
+            margin-bottom: 0.25em;
+        }
+
+        .email button:first-of-type {
+            margin-top: 0.5em;
+        }
+
+        .email-text, .email-html {
+            margin-top: 0.75em;
+        }
+
+        .email-text {
+            white-space: pre-line;
+        }
+    </style>
+</head>
+<body>
+    <h1>aws-ses-v2-local viewer</h1>
+    <div id="content">
+        <p>Loading...</p>
+    </div>
+    <p>Refresh this page to get new data</p>
+    <p>You can also access this data directly from the API yourself at <a href="/store"><code>GET /store</code></a></p>
+    <script>
+        const toggle = (id) => {
+            const elem = document.getElementById(id)
+            if (elem.style.display !== 'none') {
+                elem.style.display = 'none'
+            } else {
+                elem.style.display = ''
+            }
+        }
+
+        fetch('/store').then(r => r.json()).then(store => {
+            document.getElementById('content').innerHTML = store.emails.map(e => `<div class="email">
+                <p><b>Subject:</b> ${e.subject}</p>
+                <p><b>From:</b> ${e.from}</p>
+                ${e.destination.to.length ? `<p><b>To:</b> ${e.destination.to.join(', ')}</p>` : ''}
+                ${e.destination.cc.length ? `<p><b>Cc:</b> ${e.destination.cc.join(', ')}</p>` : ''}
+                ${e.destination.bcc.length ? `<p><b>Bcc:</b> ${e.destination.bcc.join(', ')}</p>` : ''}
+                ${e.replyTo.length ? `<p><b>Reply to:</b> ${e.replyTo.join(', ')}</p>` : ''}
+                
+                ${e.body.text ? `<button onclick="toggle('${e.messageId}-text')">Toggle text view</button>` : ''}
+                ${e.body.html ? `<button onclick="toggle('${e.messageId}-html')">Toggle HTML view</button>` : ''}
+                
+                ${e.body.text ? `<div class="email-text" id="${e.messageId}-text" style="display: none">${e.body.text}</div>` : ''}
+                ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none">${e.body.html}</div>` : ''}
+            </div>`).join('')
+        })
+        .catch(err => {
+            alert('Something went wrong trying to display the emails. Check the browser console for logs.')
+            console.error(err)
+        })
+    </script>
+</body>
+</html>

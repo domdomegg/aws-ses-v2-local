@@ -1,11 +1,14 @@
 {
-  "name": "typescript-library-template",
+  "name": "aws-ses-v2-local",
   "version": "0.0.0",
-  "description": "Template for creating TypeScript libraries",
+  "description": "A local version of Amazon Simple Email Service (AWS SES) supporting the V2 API",
   "license": "MIT",
   "author": "Adam Jones (domdomegg)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "aws-ses-v2-local": "dist/cli.js"
+  },
   "files": [
     "dist"
   ],
@@ -16,11 +19,13 @@
     "lint": "eslint src test --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint src test --ext .js,.jsx,.ts,.tsx --fix",
     "clean": "rm -rf dist",
-    "build": "tsc",
+    "build": "tsc && cp src/index.html dist/index.html",
     "prepublishOnly": "npm run clean && npm run build"
   },
   "devDependencies": {
+    "@types/express": "^4.17.13",
     "@types/jest": "^27.0.2",
+    "@types/json-schema": "^7.0.9",
     "@typescript-eslint/eslint-plugin": "^5.3.0",
     "@typescript-eslint/parser": "^5.3.0",
     "eslint": "^7.32.0",
@@ -34,5 +39,9 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node"
+  },
+  "dependencies": {
+    "ajv": "^8.6.3",
+    "express": "^4.17.1"
   }
 }
