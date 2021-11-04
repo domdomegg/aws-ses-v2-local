@@ -47,7 +47,6 @@
     <div id="content">
         <p>Loading...</p>
     </div>
-    <p>Refresh this page to get new data</p>
     <p>You can also access this data directly from the API yourself at <a href="/store"><code>GET /store</code></a></p>
     <script>
         const toggle = (id) => {
@@ -73,7 +72,11 @@
                 
                 ${e.body.text ? `<div class="email-text" id="${e.messageId}-text" style="display: none">${e.body.text}</div>` : ''}
                 ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none">${e.body.html}</div>` : ''}
-            </div>`).join('')
+            </div>`).join('') + '<p>Refresh this page to get new data</p>'
+
+            if (store.emails.length === 0) {
+                document.getElementById('content').innerHTML = 'No emails received yet - try sending one and refresh this page'
+            }
         })
         .catch(err => {
             alert('Something went wrong trying to display the emails. Check the browser console for logs.')
