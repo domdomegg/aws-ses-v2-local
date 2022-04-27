@@ -1,22 +1,33 @@
 import type { RequestHandler } from 'express';
 import type { JSONSchema7 } from 'json-schema';
-import ajv from './ajv';
-import store from './store';
+import { AddressObject, simpleParser } from 'mailparser';
+import ajv from '../ajv';
+import store from '../store';
 
-const handler: RequestHandler = (req, res) => {
+const handler: RequestHandler = (req, res, next) => {
   const valid = validate(req.body);
   if (!valid) {
-    res.status(404).send({ message: 'Bad Request Exception', detail: 'Schema validation failed' });
+    res.status(404).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed' });
     return;
   }
 
+  if (req.body.Content?.Simple) {
+    handleSimple(req, res, next);
+  } else if (req.body.Content?.Raw) {
+    handleRaw(req, res, next);
+  } else {
+    res.status(400).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have either Simple or Raw content. Want to add support for other types of emails? Open a PR!' });
+  }
+};
+
+const handleSimple: RequestHandler = async (req, res) => {
   if (!req.body.Content?.Simple?.Body?.Html?.Data && !req.body.Content?.Simple?.Body?.Text?.Data) {
-    res.status(400).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have Simple content with either a HTML or Text body. Want to add support for other types of emails? Open a PR!' });
+    res.status(400).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Simple content must have either a HTML or Text body.' });
     return;
   }
 
   if (!req.body.Content?.Simple?.Subject?.Data) {
-    res.status(400).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have Simple content with a subject. Want to add support for other types of emails? Open a PR!' });
+    res.status(400).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Simple content must have a subject.' });
     return;
   }
 
@@ -41,6 +52,32 @@ const handler: RequestHandler = (req, res) => {
       html: req.body.Content.Simple.Body.Html?.Data,
       text: req.body.Content.Simple.Body.Text?.Data,
     },
+    attachments: [],
+    at: Math.floor(new Date().getTime() / 1000),
+  });
+
+  res.status(200).send({ MessageId: messageId });
+};
+
+const handleRaw: RequestHandler = async (req, res) => {
+  const messageId = `ses-${Math.floor(Math.random() * 900000000 + 100000000)}`;
+
+  const message = await simpleParser(Buffer.from(req.body.Content?.Raw?.Data, 'base64'));
+
+  store.emails.push({
+    messageId,
+    from: message.from?.text ?? req.body.Source,
+    replyTo: message.replyTo ? [message.replyTo.text] : [],
+    destination: {
+      to: (Array.isArray(message.to) ? message.to : [message.to || null]).filter((m): m is AddressObject => !!m).map((a) => a.text),
+      cc: (Array.isArray(message.cc) ? message.cc : [message.cc || null]).filter((m): m is AddressObject => !!m).map((a) => a.text),
+      bcc: (Array.isArray(message.bcc) ? message.bcc : [message.bcc || null]).filter((m): m is AddressObject => !!m).map((a) => a.text),
+    },
+    subject: message.subject ?? '(no subject)',
+    body: {
+      text: message.text,
+    },
+    attachments: message.attachments.map((a) => ({ ...a, content: a.content.toString('base64') })),
     at: Math.floor(new Date().getTime() / 1000),
   });
 

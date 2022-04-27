@@ -1,10 +1,25 @@
 # aws-ses-v2-local
 
-A local version of Amazon Simple Email Service (AWS SES) supporting the [V2 API](https://docs.aws.amazon.com/ses/latest/APIReference-V2/Welcome.html). Currently focuses on the SendEmail endpoint.
+A local version of Amazon Simple Email Service (AWS SES) supporting both the [V1 API](https://docs.aws.amazon.com/ses/latest/APIReference/Welcome.html) and the [V2 API](https://docs.aws.amazon.com/ses/latest/APIReference-V2/Welcome.html). Currently focuses on the SendEmail and SendRawEmail endpoints.
 
 Are you using serverless-offline? You might be interested in [serverless-offline-ses-v2](https://github.com/domdomegg/serverless-offline-ses-v2).
 
 ![Screenshot of the email viewer tool](./screenshot.png)
+
+## Features
+
+- SES V1 SendEmail endpoint
+- SES V1 SendRawEmail endpoint
+- SES V2 SendEmail endpoint (both Simple and Raw)
+- Realistic API responses, compatible with the AWS SDK (in JavaScript/TypeScript/Node.js, Java, Python, Go, C++, .NET, PHP, Ruby, CLI)
+- To, Cc, Bcc, ReplyTo and From addresses
+- Plain text and HTML emails
+- Accept and view attachments
+- Built in email web viewer
+- API access to emails at `GET /store`
+- Health check endpoint at `GET /health-check`
+- Control it from the CLI, or import it as a library
+- TypeScript definitions
 
 ## Install
 
@@ -16,7 +31,7 @@ npm install aws-ses-v2-local
 
 ### Setting up aws-ses-v2-local
 
-You can run it as a command line tool (in your package.json scripts, or install it globally with the `-g` flag)
+Run it as a command line tool (in your package.json scripts, or install it globally with `npm install -g aws-ses-v2-local`)
 
 ```
 aws-ses-v2-local
@@ -28,48 +43,99 @@ Alternatively, you can import it and run it yourself (along with optional config
 import server from 'aws-ses-v2-local'
 
 server({ port: 8005 })
-console.log('The aws-ses-v2-local server is up and running!')
+console.log('aws-ses-v2-local: server up and running')
 ```
 
 ### Setting up your application
 
-You can treat the server as an AWS SES endpoint. For example in JavaScript/TypeScript with the V3 SDK:
+You can treat the server as an AWS SES endpoint. See the starter for your language:
+
+<details>
+<summary>JavaScript/TypeScript for the V2 API with the V3 SDK (recommended)</summary>
 
 ```typescript
 import { SESv2Client, SendEmailCommand, SendEmailCommandInput } from "@aws-sdk/client-sesv2"
 
-const sesClient = new SESv2Client({ endpoint: "http://localhost:8005" })
-const command = new SendEmailCommand({
+const ses = new SESv2Client({ endpoint: "http://localhost:8005" })
+await ses.send(new SendEmailCommand({
+    FromEmailAddress: 'sender@example.com',
+    Destination: { ToAddresses: ['receiver@example.com'] },
     Content: {
         Simple: {
+            Subject: { Data: 'This is the subject' },
             Body: { Text: { Data: 'This is the email contents' } },
-            Subject: { Data: 'This is the subject' }
         }
     },
-    Destination: { ToAddresses: ['receiver@example.com'] },
-    FromEmailAddress: 'sender@example.com',
-})
-const data = await sesClient.send(command)
+}))
 ```
 
-Or with the V2 SDK:
+</details>
+
+<details>
+<summary>JavaScript/TypeScript for the V1 API with the V3 SDK</summary>
+
+```typescript
+import { SES, SendEmailCommand } from '@aws-sdk/client-ses'
+
+const ses = new SES({ endpoint: "http://localhost:8005" })
+await ses.send(new SendEmailCommand({
+    Source: 'sender@example.com',
+    Destination: { ToAddresses: ['receiver@example.com'] },
+    Message: {
+        Subject: { Data: 'This is the subject' },
+        Body: { Text: { Data: 'This is the email contents' } },
+    },
+}))
+```
+
+</details>
+
+<details>
+<summary>JavaScript/TypeScript for the V2 API with the V2 SDK</summary>
 
 ```typescript
 import AWS from 'aws-sdk'
 
-const sesClient = new AWS.SESV2({ endpoint: "http://localhost:8005" })
-const params = {
+const ses = new AWS.SESV2({ endpoint: "http://localhost:8005" })
+ses.sendEmail({
+    FromEmailAddress: 'sender@example.com',
+    Destination: { ToAddresses: ['receiver@example.com'] },
     Content: {
         Simple: {
+            Subject: { Data: 'This is the subject' },
             Body: { Text: { Data: 'This is the email contents' } },
-            Subject: { Data: 'This is the subject' }
         }
     },
-    Destination: { ToAddresses: ['receiver@example.com'] },
-    FromEmailAddress: 'sender@example.com',
-}
-sesClient.sendEmail(params)
+})
 ```
+
+</details>
+
+<details>
+<summary>JavaScript/TypeScript with nodemailer for the V1 raw API with the V3 SDK</summary>
+
+```typescript
+import * as aws from '@aws-sdk/client-ses'
+
+const ses = new aws.SES({ endpoint: 'http://localhost:8005' })
+const transporter = nodemailer.createTransport({ SES: { ses, aws } })
+
+await transporter.sendMail({
+    from: 'sender@example.com',
+    to: ['receiver@example.com'],
+    subject: 'This is the subject',
+    text: 'This is the email contents',
+    attachments: [{
+        filename: `some-file.pdf`,
+        contentType: 'application/pdf',
+        content: Buffer.from(pdfBytes),
+    }],
+})
+```
+
+</details>
+
+Using another language or version? Submit a PR to update this list :)
 
 ### Viewing emails
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -33,7 +34,8 @@
             margin-top: 0.5em;
         }
 
-        .email-text, .email-html {
+        .email-text,
+        .email-html {
             margin-top: 0.75em;
         }
 
@@ -42,12 +44,16 @@
         }
     </style>
 </head>
+
 <body>
     <h1>aws-ses-v2-local viewer</h1>
     <div id="content">
         <p>Loading...</p>
     </div>
-    <p>You can also access this data directly from the API yourself at <a href="/store"><code>GET /store</code></a></p>
+    <p>You can also access this data directly from the API yourself at <a href="/store"><code>GET /store</code></a>.</p>
+    <p>aws-ses-v2-local is made by Adam Jones. <a href="https://github.com/domdomegg/aws-ses-v2-local" target="_blank">
+            View the documentation, code and discussions on GitHub</a>.
+    </p>
     <script>
         const toggle = (id) => {
             const elem = document.getElementById(id)
@@ -58,6 +64,10 @@
             }
         }
 
+        const makeBlob = (type, content) => {
+            return URL.createObjectURL(new Blob([Uint8Array.from(atob(content), c => c.charCodeAt(0))], { type }))
+        }
+
         fetch('/store').then(r => r.json()).then(store => {
             document.getElementById('content').innerHTML = store.emails.map(e => `<div class="email">
                 <p><b>Subject:</b> ${e.subject}</p>
@@ -66,6 +76,7 @@
                 ${e.destination.cc.length ? `<p><b>Cc:</b> ${e.destination.cc.join(', ')}</p>` : ''}
                 ${e.destination.bcc.length ? `<p><b>Bcc:</b> ${e.destination.bcc.join(', ')}</p>` : ''}
                 ${e.replyTo.length ? `<p><b>Reply to:</b> ${e.replyTo.join(', ')}</p>` : ''}
+                ${e.attachments.length ? `<p><b>Attachments:</b> ${e.attachments.map(a => '<a href="' + makeBlob(a.contentType, a.content) + '">' + (a.filename ?? "(untitled)") + '</a>').join(', ')}</p>` : ''}
                 
                 ${e.body.text ? `<button onclick="toggle('${e.messageId}-text')">Toggle text view</button>` : ''}
                 ${e.body.html ? `<button onclick="toggle('${e.messageId}-html')">Toggle HTML view</button>` : ''}
@@ -75,13 +86,14 @@
             </div>`).join('') + '<p>Refresh this page to get new data</p>'
 
             if (store.emails.length === 0) {
-                document.getElementById('content').innerHTML = 'No emails received yet - try sending one and refresh this page'
+                document.getElementById('content').innerHTML = 'No emails received yet - try sending one and refresh this page.'
             }
         })
-        .catch(err => {
-            alert('Something went wrong trying to display the emails. Check the browser console for logs.')
-            console.error(err)
-        })
+            .catch(err => {
+                alert('Something went wrong trying to display the emails. Check the browser console for logs.')
+                console.error(err)
+            })
     </script>
 </body>
+
 </html>
