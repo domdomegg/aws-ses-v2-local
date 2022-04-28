@@ -7,17 +7,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>aws-ses-v2-local viewer</title>
     <style>
+        /* Theming */
+
+        html,
+        html[data-theme='light'] {
+            --background: #fff;
+            --background-inset: #fafafa;
+            --borders: #ccc;
+            --color: #000;
+            --link: #0ea5e9;
+            --link-hover: #38bdf8;
+        }
+
+        html[data-theme='dark'] {
+            --background: #18181B;
+            --background-inset: #27272A;
+            --borders: #3F3F46;
+            --color: #fff;
+            --link: #0ea5e9;
+            --link-hover: #38bdf8;
+        }
+
+        /* General styles */
+
         html {
             font-family: sans-serif;
             margin: 1em 2em 2em 2em;
+            color: var(--color);
+            background: var(--background)
+        }
+
+        button {
+            background: var(--background-inset);
+            color: var(--color);
+            border: 1px solid var(--borders);
+            padding: 6px 10px;
+            font-size: 100%;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: var(--background);
+        }
+
+        a {
+            color: var(--link)
+        }
+
+        a:hover {
+            color: var(--link-hover)
+        }
+
+        .title {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+
+        .title> :first-child {
+            flex: 1;
         }
 
         .email {
-            border: 1px solid #ccc;
+            border: 1px solid var(--borders);
             border-radius: 0.5em;
-            padding: 1em;
+            box-shadow: 1.2px 1.2px 1.8px rgba(0 0 0 / 4%), 4px 4px 4px rgba(0 0 0 / 7%);
             margin-bottom: 1em;
-            box-shadow: 1.2px 1.2px 1.8px rgb(0 0 0 / 4%), 4px 4px 4px rgb(0 0 0 / 7%);
+        }
+
+        .email-inner {
+            padding: 1em;
         }
 
         .email p {
@@ -41,15 +101,55 @@
 
         .email-text {
             white-space: pre-line;
+            border: 1px solid var(--borders);
+            border-radius: 0.5em;
+            padding: 20px;
+            background: var(--background-inset);
+        }
+
+        .email-html iframe {
+            width: 100%;
+            height: 700px;
+            border: 1px solid var(--borders);
+            border-radius: 0.5em;
+        }
+
+        .email {
+            animation-name: example;
+            animation-duration: 1s;
+            overflow: hidden;
+        }
+
+        @keyframes example {
+            0% {
+                max-height: 0;
+                margin-bottom: 0;
+                background: var(--background-inset);
+            }
+
+            10% {
+                margin-bottom: 1rem;
+            }
+
+            100% {
+                max-height: 100vh;
+                background: var(--background);
+            }
         }
     </style>
 </head>
 
 <body>
-    <h1>aws-ses-v2-local viewer</h1>
-    <div id="content">
-        <p>Loading...</p>
+    <div class="title">
+        <h1>aws-ses-v2-local viewer</h1>
+        <button onclick="changeTheme()">Change theme</button>
     </div>
+    <noscript>
+        <h1>Error: You need JavaScript enabled for this page to work!</h1>
+    </noscript>
+    <div id="content">
+    </div>
+    <p>Emails will appear above automatically.</p>
     <p>You can also access this data directly from the API yourself at <a href="/store"><code>GET /store</code></a>.</p>
     <p>aws-ses-v2-local is made by Adam Jones. <a href="https://github.com/domdomegg/aws-ses-v2-local" target="_blank">
             View the documentation, code and discussions on GitHub</a>.
@@ -64,35 +164,84 @@
             }
         }
 
+        const pForEscape = document.createElement('p')
+        const escape = (s) => {
+            pForEscape.innerText = s;
+            return pForEscape.innerHTML;
+        }
+
         const makeBlob = (type, content) => {
             return URL.createObjectURL(new Blob([Uint8Array.from(atob(content), c => c.charCodeAt(0))], { type }))
         }
 
-        fetch('/store').then(r => r.json()).then(store => {
-            document.getElementById('content').innerHTML = store.emails.map(e => `<div class="email">
-                <p><b>Subject:</b> ${e.subject}</p>
-                <p><b>From:</b> ${e.from}</p>
-                ${e.destination.to.length ? `<p><b>To:</b> ${e.destination.to.join(', ')}</p>` : ''}
-                ${e.destination.cc.length ? `<p><b>Cc:</b> ${e.destination.cc.join(', ')}</p>` : ''}
-                ${e.destination.bcc.length ? `<p><b>Bcc:</b> ${e.destination.bcc.join(', ')}</p>` : ''}
-                ${e.replyTo.length ? `<p><b>Reply to:</b> ${e.replyTo.join(', ')}</p>` : ''}
-                ${e.attachments.length ? `<p><b>Attachments:</b> ${e.attachments.map(a => '<a href="' + makeBlob(a.contentType, a.content) + '">' + (a.filename ?? "(untitled)") + '</a>').join(', ')}</p>` : ''}
-                
-                ${e.body.text ? `<button onclick="toggle('${e.messageId}-text')">Toggle text view</button>` : ''}
-                ${e.body.html ? `<button onclick="toggle('${e.messageId}-html')">Toggle HTML view</button>` : ''}
-                
-                ${e.body.text ? `<div class="email-text" id="${e.messageId}-text" style="display: none">${e.body.text}</div>` : ''}
-                ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none">${e.body.html}</div>` : ''}
-            </div>`).join('') + '<p>Refresh this page to get new data</p>'
+        const seenEmails = {}
+        let lastEmailTimestamp = 0;
 
-            if (store.emails.length === 0) {
-                document.getElementById('content').innerHTML = 'No emails received yet - try sending one and refresh this page.'
-            }
-        })
-            .catch(err => {
+        const refreshEmails = () => {
+            return fetch(`/store?since=${lastEmailTimestamp}`).then(r => r.json()).then(store => {
+                const newEmails = store.emails.filter(e => !seenEmails[e.messageId])
+
+                newEmails.forEach(e => {
+                    seenEmails[e.messageId] = true;
+                    lastEmailTimestamp = e.at;
+
+                    const node = document.createElement('div')
+                    node.className = 'email'
+                    node.innerHTML = `<div class="email-inner">
+                    <p><b>Subject:</b> ${escape(e.subject)}</p>
+                    <p><b>At:</b> ${new Date(e.at * 1000)}</p>
+                    <p><b>From:</b> ${escape(e.from)}</p>
+                    ${e.destination.to.length ? `<p><b>To:</b> ${escape(e.destination.to.join(', '))}</p>` : ''}
+                    ${e.destination.cc.length ? `<p><b>Cc:</b> ${escape(e.destination.cc.join(', '))}</p>` : ''}
+                    ${e.destination.bcc.length ? `<p><b>Bcc:</b> ${escape(e.destination.bcc.join(', '))}</p>` : ''}
+                    ${e.replyTo.length ? `<p><b>Reply to:</b> ${escape(e.replyTo.join(', '))}</p>` : ''}
+                    ${e.attachments.length ? `<p><b>Attachments:</b> ${e.attachments.map(a => '<a href="' + makeBlob(a.contentType, a.content) + '">' + (escape(a.filename) ?? "(untitled)") + '</a>').join(', ')}</p>` : ''}
+                    
+                    ${e.body.text ? `<button onclick="toggle('${e.messageId}-text')">Toggle text view</button>` : ''}
+                    ${e.body.html ? `<button onclick="toggle('${e.messageId}-html')">Toggle HTML view</button>` : ''}
+                    
+                    ${e.body.text ? `<div class="email-text" id="${e.messageId}-text" style="display: none">${escape(e.body.text)}</div>` : ''}
+                    ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none"><iframe id="${e.messageId}-html-iframe"></iframe></div>` : ''}
+                    </div>`
+
+                    document.getElementById('content').prepend(node)
+
+                    if (e.body.html) {
+                        const iframe = document.getElementById(`${e.messageId}-html-iframe`);
+                        const iframeDoc = (iframe.contentDocument || iframe.contentWindow.document);
+                        iframeDoc.body.innerHTML = e.body.html;
+                    }
+                })
+            }).catch(err => {
                 alert('Something went wrong trying to display the emails. Check the browser console for logs.')
                 console.error(err)
             })
+        }
+
+        const getTheme = () => {
+            const fromLocalStorage = localStorage.getItem('theme')
+            if (fromLocalStorage === 'light' || fromLocalStorage === 'dark') return fromLocalStorage
+
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                return 'dark'
+            }
+
+            return 'light'
+        }
+
+        const changeTheme = () => {
+            const newTheme = theme === 'light' ? 'dark' : 'light';
+            theme = newTheme
+
+            document.documentElement.setAttribute('data-theme', theme)
+            localStorage.setItem('theme', theme);
+        }
+
+        let theme = getTheme()
+        document.documentElement.setAttribute('data-theme', theme);
+
+        refreshEmails()
+        setInterval(refreshEmails, 1000)
     </script>
 </body>
 

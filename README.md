@@ -15,7 +15,7 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 - To, Cc, Bcc, ReplyTo and From addresses
 - Plain text and HTML emails
 - Accept and view attachments
-- Built in email web viewer
+- Built in web viewer, with live inbox, optional dark theme, and compatibility with all emails
 - API access to emails at `GET /store`
 - Health check endpoint at `GET /health-check`
 - Control it from the CLI, or import it as a library

@@ -29,7 +29,21 @@ const server = (partialConfig: Partial<Config> = {}): Server => {
   });
 
   app.get('/store', (req, res) => {
-    res.status(200).send(store);
+    if (!req.query.since) {
+      res.status(200).send(store);
+      return;
+    }
+
+    if (typeof req.query.since !== 'string') {
+      res.status(400).send({ message: 'Bad since query param, expected single value' });
+    }
+
+    const since = parseInt(req.query.since as string, 10);
+    if (Number.isNaN(since) || req.query.since !== String(since)) {
+      res.status(400).send({ message: 'Bad since query param, expected integer representing epoch timestamp in seconds' });
+    }
+
+    res.status(200).send({ ...store, emails: store.emails.filter((e) => e.at >= since) });
   });
 
   app.get('/health-check', (req, res) => {
