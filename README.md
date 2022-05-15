@@ -58,6 +58,7 @@ import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2"
 
 const ses = new SESv2Client({
     endpoint: 'http://localhost:8005',
+    region: 'aws-ses-v2-local',
     credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
 });
 await ses.send(new SendEmailCommand({
@@ -82,6 +83,7 @@ import { SES, SendEmailCommand } from '@aws-sdk/client-ses'
 
 const ses = new SES({
     endpoint: 'http://localhost:8005',
+    region: 'aws-ses-v2-local',
     credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
 })
 await ses.send(new SendEmailCommand({
@@ -104,6 +106,7 @@ import AWS from 'aws-sdk'
 
 const ses = new AWS.SESV2({
     endpoint: 'http://localhost:8005',
+    region: 'aws-ses-v2-local',
     credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
 })
 ses.sendEmail({
@@ -128,6 +131,7 @@ import * as aws from '@aws-sdk/client-ses'
 
 const ses = new aws.SES({
     endpoint: 'http://localhost:8005',
+    region: 'aws-ses-v2-local',
     credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
 })
 const transporter = nodemailer.createTransport({ SES: { ses, aws } })

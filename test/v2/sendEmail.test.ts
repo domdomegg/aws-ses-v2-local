@@ -36,6 +36,7 @@ afterAll(async () => {
 test('can send email with v2 API', async () => {
   const ses = new SESv2Client({
     endpoint: baseURL,
+    region: 'aws-ses-v2-local',
     credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
   });
   await ses.send(new SendEmailCommand({
