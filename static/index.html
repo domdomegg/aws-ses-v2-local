@@ -17,6 +17,8 @@
             --color: #000;
             --link: #0ea5e9;
             --link-hover: #38bdf8;
+            --error-background: #d32f2f;
+            --error-text: #fff;
         }
 
         html[data-theme='dark'] {
@@ -26,6 +28,16 @@
             --color: #fff;
             --link: #0ea5e9;
             --link-hover: #38bdf8;
+            --error-background: #d32f2f;
+            --error-text: #fff;
+        }
+
+        html[class^="theme-change"],
+        html[class^="theme-change"] *,
+        html[class^="theme-change"] *:before,
+        html[class^="theme-change"] *:after {
+            transition: background-color 400ms, border-color 400ms, color 100ms !important;
+            transition-delay: 0 !important;
         }
 
         /* General styles */
@@ -39,6 +51,7 @@
 
         button {
             background: var(--background-inset);
+            transition: background-color 200ms;
             color: var(--color);
             border: 1px solid var(--borders);
             padding: 6px 10px;
@@ -67,6 +80,19 @@
 
         .title> :first-child {
             flex: 1;
+        }
+
+        .error {
+            background-color: var(--error-background);
+            color: var(--error-text);
+            border-radius: 0.5em;
+            box-shadow: 1.2px 1.2px 1.8px rgba(0 0 0 / 4%), 4px 4px 4px rgba(0 0 0 / 7%);
+            margin-bottom: 1em;
+            padding: 1em;
+        }
+
+        .error * {
+            margin: 0;
         }
 
         .email {
@@ -115,12 +141,12 @@
         }
 
         .email {
-            animation-name: example;
+            animation-name: appear;
             animation-duration: 1s;
             overflow: hidden;
         }
 
-        @keyframes example {
+        @keyframes appear {
             0% {
                 max-height: 0;
                 margin-bottom: 0;
@@ -145,10 +171,12 @@
         <button onclick="changeTheme()">Change theme</button>
     </div>
     <noscript>
-        <h1>Error: You need JavaScript enabled for this page to work!</h1>
+        <div class="error">
+            <h2>Error: You need JavaScript enabled for this page to work.</h2>
+        </div>
     </noscript>
-    <div id="content">
-    </div>
+    <div class="error" id="error" style="display: none"></div>
+    <div id="content"></div>
     <p>Emails will appear above automatically.</p>
     <p>You can also access this data directly from the API yourself at <a href="/store"><code>GET /store</code></a>.</p>
     <p>aws-ses-v2-local is made by Adam Jones. <a href="https://github.com/domdomegg/aws-ses-v2-local" target="_blank">
@@ -177,8 +205,19 @@
         const seenEmails = {}
         let lastEmailTimestamp = 0;
 
-        const refreshEmails = () => {
-            return fetch(`/store?since=${lastEmailTimestamp}`).then(r => r.json()).then(store => {
+        const refreshEmails = async () => {
+            let res;
+            try {
+                res = await fetch(`/store?since=${lastEmailTimestamp}`)
+                clearError()
+            } catch (err) {
+                showError('Couldn\'t fetch new emails.', 'You should check the server is still running. We\'ll automatically reconnect when it comes back online. See the browser console for more details.')
+                console.error(err)
+                return;
+            }
+            const store = await res.json()
+
+            try {
                 const newEmails = store.emails.filter(e => !seenEmails[e.messageId])
 
                 newEmails.forEach(e => {
@@ -212,10 +251,20 @@
                         iframeDoc.body.innerHTML = e.body.html;
                     }
                 })
-            }).catch(err => {
-                alert('Something went wrong trying to display the emails. Check the browser console for logs.')
+            } catch (err) {
+                showError('Failed to render emails.', 'Something went wrong trying to display the emails. This is probably a bug or missing feature in aws-ses-v2-local so you might want to raise an issue or PR. See the browser console for more details.')
                 console.error(err)
-            })
+            }
+        }
+
+        const showError = (title, description) => {
+            const elem = document.getElementById('error');
+            elem.innerHTML = `<h2>Error: ${title}</h2>${description ? `<p>${description}</p>` : ''}`
+            elem.style.display = '';
+        }
+
+        const clearError = () => {
+            document.getElementById('error').style.display = 'none';
         }
 
         const getTheme = () => {
@@ -233,8 +282,15 @@
             const newTheme = theme === 'light' ? 'dark' : 'light';
             theme = newTheme
 
+            const themeChangeClass = `theme-change-${Date.now()}`
+            document.documentElement.classList.add(themeChangeClass)
+
             document.documentElement.setAttribute('data-theme', theme)
             localStorage.setItem('theme', theme);
+
+            window.setTimeout(function () {
+                document.documentElement.classList.remove(themeChangeClass)
+            }, 500)
         }
 
         let theme = getTheme()

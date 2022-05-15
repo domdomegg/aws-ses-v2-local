@@ -25,7 +25,7 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
   app.use(express.urlencoded({ extended: false, limit: '25mb' }));
 
   app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, '../static/index.html'));
   });
 
   app.get('/store', (req, res) => {
