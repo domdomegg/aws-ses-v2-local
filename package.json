@@ -16,7 +16,7 @@
   "files": [
     "dist",
     "static",
-    "screenshot.png"
+    "branding"
   ],
   "scripts": {
     "start": "npm run build && node dist/cli.js",

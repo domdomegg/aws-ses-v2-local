@@ -4,7 +4,11 @@ A local version of Amazon Simple Email Service (AWS SES) supporting both the [V1
 
 Are you using serverless-offline? You might be interested in [serverless-offline-ses-v2](https://github.com/domdomegg/serverless-offline-ses-v2).
 
-![Screenshot of the email viewer tool](./screenshot.png)
+![Screenshot of the email viewer tool](./branding/text-email.png)
+
+| HTML emails | Dark theme |
+| - | - |
+| ![The viewer tool showing an HTML email](./branding/html-email.png) | ![The viewer tool with a dark theme: white on black instead of black on white](branding/dark-theme.png) |
 
 ## Features
 
