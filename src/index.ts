@@ -14,7 +14,7 @@ export const defaultConfig: Config = {
   port: 8005,
 };
 
-const server = (partialConfig: Partial<Config> = {}): Server => {
+const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
   const config: Config = {
     ...defaultConfig,
     ...partialConfig,
@@ -74,7 +74,9 @@ const server = (partialConfig: Partial<Config> = {}): Server => {
     res.status(404).send('<UnknownOperationException/>');
   });
 
-  return app.listen(config.port);
+  return new Promise((resolve) => {
+    const s = app.listen(config.port, () => resolve(s));
+  });
 };
 
 export default server;
