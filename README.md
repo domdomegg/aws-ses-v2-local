@@ -54,9 +54,12 @@ You can treat the server as an AWS SES endpoint. See the starter for your langua
 <summary>JavaScript/TypeScript for the V2 API with the V3 SDK (recommended)</summary>
 
 ```typescript
-import { SESv2Client, SendEmailCommand, SendEmailCommandInput } from "@aws-sdk/client-sesv2"
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2"
 
-const ses = new SESv2Client({ endpoint: "http://localhost:8005" })
+const ses = new SESv2Client({
+    endpoint: 'http://localhost:8005',
+    credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
+});
 await ses.send(new SendEmailCommand({
     FromEmailAddress: 'sender@example.com',
     Destination: { ToAddresses: ['receiver@example.com'] },
@@ -77,7 +80,10 @@ await ses.send(new SendEmailCommand({
 ```typescript
 import { SES, SendEmailCommand } from '@aws-sdk/client-ses'
 
-const ses = new SES({ endpoint: "http://localhost:8005" })
+const ses = new SES({
+    endpoint: 'http://localhost:8005',
+    credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
+})
 await ses.send(new SendEmailCommand({
     Source: 'sender@example.com',
     Destination: { ToAddresses: ['receiver@example.com'] },
@@ -96,7 +102,10 @@ await ses.send(new SendEmailCommand({
 ```typescript
 import AWS from 'aws-sdk'
 
-const ses = new AWS.SESV2({ endpoint: "http://localhost:8005" })
+const ses = new AWS.SESV2({
+    endpoint: 'http://localhost:8005',
+    credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
+})
 ses.sendEmail({
     FromEmailAddress: 'sender@example.com',
     Destination: { ToAddresses: ['receiver@example.com'] },
@@ -117,7 +126,10 @@ ses.sendEmail({
 ```typescript
 import * as aws from '@aws-sdk/client-ses'
 
-const ses = new aws.SES({ endpoint: 'http://localhost:8005' })
+const ses = new aws.SES({
+    endpoint: 'http://localhost:8005',
+    credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
+})
 const transporter = nodemailer.createTransport({ SES: { ses, aws } })
 
 await transporter.sendMail({
