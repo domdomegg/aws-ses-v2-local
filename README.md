@@ -15,7 +15,7 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 - SES V1 SendEmail endpoint
 - SES V1 SendRawEmail endpoint
 - SES V2 SendEmail endpoint (both Simple and Raw)
-- Realistic API responses, compatible with the AWS SDK (in JavaScript/TypeScript/Node.js, Java, Python, Go, C++, .NET, PHP, Ruby, CLI)
+- Realistic API responses, compatible with the AWS SDK (in JavaScript/TypeScript/Node.js, Java, Python, Go, C++, .NET, PHP, Ruby) and the AWS CLI
 - To, Cc, Bcc, ReplyTo and From addresses
 - Plain text and HTML emails
 - Accept and view attachments
