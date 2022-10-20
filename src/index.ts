@@ -7,10 +7,12 @@ import v2SendEmail from './v2/sendEmail';
 import store from './store';
 
 export interface Config {
+  host: string,
   port: number,
 }
 
 export const defaultConfig: Config = {
+  host: 'localhost',
   port: 8005,
 };
 
@@ -75,7 +77,7 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
   });
 
   return new Promise((resolve) => {
-    const s = app.listen(config.port, () => resolve(s));
+    const s = app.listen(config.port, config.host, () => resolve(s));
   });
 };
 
