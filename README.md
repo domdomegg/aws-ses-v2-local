@@ -15,6 +15,10 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 - SES V1 SendEmail endpoint
 - SES V1 SendRawEmail endpoint
 - SES V2 SendEmail endpoint (both Simple and Raw)
+- SES V2 createEmailTemplate endpoint
+- SES V2 deleteEmailTemplate endpoint
+- SES V2 getAccount endpoint (returns the content of the AWS_SES_ACCOUNT env variable)
+- SES V2 sendBulkEmail endpoint (only supports simple placeholder replacement)
 - Realistic API responses, compatible with the AWS SDK (in JavaScript/TypeScript/Node.js, Java, Python, Go, C++, .NET, PHP, Ruby) and the AWS CLI
 - To, Cc, Bcc, ReplyTo and From addresses
 - Plain text and HTML emails
@@ -24,6 +28,7 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 - Health check endpoint at `GET /health-check`
 - Control it from the CLI, or import it as a library
 - TypeScript definitions
+- Emails can be forwarded to a SMTP server via the SMPT_TRANSPORT env variable (see https://nodemailer.com/smtp/)
 
 ## Install
 
@@ -160,3 +165,7 @@ Using another language or version? Submit a PR to update this list :)
 ### Viewing emails
 
 Navigate to the address and port where the server is running in your browser (e.g. [`localhost:8005`](http://localhost:8005/)).
+
+### Docker
+
+A Dockerfile that bakes the `/dist/cli.js` is provided. There is also a `docker-compose.example.yml` template to create a container running the aws-ses-v2-local mock server.
