@@ -1,5 +1,6 @@
 export interface Store {
   emails: Email[],
+  templates: Map<string, Template>,
 }
 
 export interface Email {
@@ -20,8 +21,18 @@ export interface Email {
   at: number,
 }
 
+export interface Template {
+  TemplateContent: {
+    Html: string,
+    Subject: string,
+    Text: string,
+  },
+  TemplateName: string,
+}
+
 const store: Store = {
   emails: [],
+  templates: new Map(),
 };
 
 export default store;

@@ -1,0 +1,22 @@
+version: '2.4'
+services:
+  aws-ses:
+    image: aws-ses-v2-local
+    build:
+      context: .
+    container_name: aws-ses-v2-local
+    hostname: aws-ses-v2-local
+    entrypoint: ['node', 'cli.js', '--host', '0.0.0.0', '--port', '8005']
+    environment:
+      AWS_SES_ACCOUNT:
+      SMTP_TRANSPORT:
+    working_dir: /srv/www/dist
+    ports:
+      - 8005:8005
+    expose:
+      - 8005
+    networks:
+      default:
+
+networks:
+  default:

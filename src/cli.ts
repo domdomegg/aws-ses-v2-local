@@ -2,9 +2,17 @@
 /* eslint-disable no-console */
 
 import server from '.';
+import { Config } from '.';
+
+// Parse the command line optinal host and port arguments.
+const args = require('yargs').argv;
+const config:Config = {
+  host: args.host ?? 'localhost',
+  port: args.port ?? 8005,
+};
 
 console.log('aws-ses-v2-local: starting server...');
-server()
+server(config)
   .then((s) => {
     let address = s.address();
     if (address && typeof address !== 'string') {

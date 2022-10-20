@@ -120,3 +120,6 @@ dist
 # built artifacts
 build/
 dist/
+
+# docker
+docker-compose.yml
