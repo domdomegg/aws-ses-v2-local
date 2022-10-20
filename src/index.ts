@@ -3,7 +3,11 @@ import express from 'express';
 import path from 'path';
 import v1SendRawEmail from './v1/sendRawEmail';
 import v1SendEmail from './v1/sendEmail';
+import v2CreateEmailTemplate from './v2/createEmailTemplate';
+import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
+import v2GetAccount from './v2/getAccount';
 import v2SendEmail from './v2/sendEmail';
+import v2SendBulkEmail from './v2/sendBulkEmail';
 import store from './store';
 
 export interface Config {
@@ -70,7 +74,16 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
     if (req.body.Action === 'SendRawEmail') v1SendRawEmail(req, res, next);
   });
 
+  // SES V2 - template handling.
+  app.post('/v2/email/templates', v2CreateEmailTemplate);
+  app.delete('/v2/email/templates/:TemplateName', v2DeleteEmailTemplate);
+
+  // SES V2 - account handling.
+  app.get('/v2/email/account', v2GetAccount);
+
+  // SES V2 - email sending.
   app.post('/v2/email/outbound-emails', v2SendEmail);
+  app.post('/v2/email/outbound-bulk-emails', v2SendBulkEmail);
 
   app.use((req, res) => {
     res.status(404).send('<UnknownOperationException/>');
