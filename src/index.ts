@@ -28,6 +28,11 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
     res.sendFile(path.join(__dirname, '../static/index.html'));
   });
 
+  app.get('/store-clear', (req, res) => {
+    store.emails = [];
+    res.status(200).send({ message: 'Emails cleared' });
+  });
+
   app.get('/store', (req, res) => {
     if (!req.query.since) {
       res.status(200).send(store);
