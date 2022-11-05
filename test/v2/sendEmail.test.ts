@@ -192,6 +192,8 @@ Object {
 </body>
 </html>
 ",
+        "text": "html email test
+",
       },
       "destination": Object {
         "bcc": Array [],
