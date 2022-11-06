@@ -169,6 +169,8 @@
     <div class="title">
         <h1>aws-ses-v2-local viewer</h1>
         <button onclick="changeTheme()">Change theme</button>
+        &nbsp;
+        <button onclick="clearEmails()">Clear</button>
     </div>
     <noscript>
         <div class="error">
@@ -291,6 +293,11 @@
             window.setTimeout(function () {
                 document.documentElement.classList.remove(themeChangeClass)
             }, 500)
+        }
+
+        const clearEmails = async () => {
+            await fetch(`/store-clear`);
+            location.reload();
         }
 
         let theme = getTheme()

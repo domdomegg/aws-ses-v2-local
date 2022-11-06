@@ -76,6 +76,7 @@ const handleRaw: RequestHandler = async (req, res) => {
     subject: message.subject ?? '(no subject)',
     body: {
       text: message.text,
+      html: message.html || undefined,
     },
     attachments: message.attachments.map((a) => ({ ...a, content: a.content.toString('base64') })),
     at: Math.floor(new Date().getTime() / 1000),
