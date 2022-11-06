@@ -1,43 +1,13 @@
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
-import type { Server } from 'http';
 import axios from 'axios';
-import server from '../../src/index';
 import { Store } from '../../src/store';
-
-let s: Server;
-let baseURL: string;
-
-beforeAll(async () => {
-  s = await server({ port: 7001 });
-  const address = s.address();
-  if (address == null) {
-    throw new Error('Started server, but didn\'t get an address');
-  }
-  if (typeof address === 'string') {
-    baseURL = address;
-  } else if (address.address === '127.0.0.1' || address.address === '::') {
-    baseURL = `http://localhost:${address.port}`;
-  } else if (address.family === 'IPv4') {
-    baseURL = `http://${address.address}:${address.port}`;
-  } else if (address.family === 'IPv6') {
-    baseURL = `http://[${address.address}]:${address.port}`;
-  } else {
-    baseURL = `${address.address}:${address.port}`;
-  }
-});
-
-afterAll(async () => {
-  await new Promise<void>((resolve, reject) => s.close((err) => {
-    if (err) return reject(err);
-    return resolve();
-  }));
-});
+import { baseURL } from '../globals';
 
 beforeEach(async () => {
   await axios({
-    method: 'get',
+    method: 'post',
+    url: '/clear-store',
     baseURL,
-    url: '/store-clear',
   });
 });
 
@@ -69,27 +39,27 @@ test('can send email with v2 API', async () => {
       {
         at: expect.any(Number),
         messageId: expect.any(String),
-      },
-    ],
+      }],
+
   }, `
-Object {
-  "emails": Array [
-    Object {
+{
+  "emails": [
+    {
       "at": Any<Number>,
-      "attachments": Array [],
-      "body": Object {
+      "attachments": [],
+      "body": {
         "text": "This is the email contents",
       },
-      "destination": Object {
-        "bcc": Array [],
-        "cc": Array [],
-        "to": Array [
+      "destination": {
+        "bcc": [],
+        "cc": [],
+        "to": [
           "receiver@example.com",
         ],
       },
       "from": "sender@example.com",
       "messageId": Any<String>,
-      "replyTo": Array [],
+      "replyTo": [],
       "subject": "This is the subject",
     },
   ],
@@ -174,18 +144,18 @@ Content-Transfer-Encoding: 8bit
       {
         at: expect.any(Number),
         messageId: expect.any(String),
-      },
-    ],
+      }],
+
   }, `
-Object {
-  "emails": Array [
-    Object {
+{
+  "emails": [
+    {
       "at": Any<Number>,
-      "attachments": Array [],
-      "body": Object {
-        "html": "<html lang=\\"en\\">
-<head title=\\"\\">
-<meta http-equiv=\\"Content-Type\\" content=\\"text/html; charset=utf-8\\">
+      "attachments": [],
+      "body": {
+        "html": "<html lang="en">
+<head title="">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 </head>
 <body>
 <div><b>html <i>email test</i></b></div>
@@ -196,16 +166,16 @@ Object {
         "text": "html email test
 ",
       },
-      "destination": Object {
-        "bcc": Array [],
-        "cc": Array [],
-        "to": Array [
+      "destination": {
+        "bcc": [],
+        "cc": [],
+        "to": [
           "someone <someone@example.com>",
         ],
       },
       "from": "You <you@yourapp.com>",
       "messageId": Any<String>,
-      "replyTo": Array [],
+      "replyTo": [],
       "subject": "Test email sent to aws-ses-v2-local!",
     },
   ],

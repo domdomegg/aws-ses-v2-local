@@ -28,7 +28,7 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
     res.sendFile(path.join(__dirname, '../static/index.html'));
   });
 
-  app.get('/store-clear', (req, res) => {
+  app.post('/clear-store', (req, res) => {
     store.emails = [];
     res.status(200).send({ message: 'Emails cleared' });
   });
