@@ -296,7 +296,7 @@
         }
 
         const clearEmails = async () => {
-            await fetch(`/store-clear`);
+            await fetch({ method: 'post', url: `/clear-store` });
             location.reload();
         }
 
