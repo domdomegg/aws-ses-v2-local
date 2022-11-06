@@ -53,7 +53,7 @@ const sendRawEmailRequestSchema: JSONSchema7 = {
     SourceArn: { type: 'string' },
     'Tags.member.1': { type: 'string' },
   },
-  required: ['Action', 'Source', 'RawMessage.Data'],
+  required: ['Action', 'RawMessage.Data'],
 };
 
 const validate = ajv.compile(sendRawEmailRequestSchema);
