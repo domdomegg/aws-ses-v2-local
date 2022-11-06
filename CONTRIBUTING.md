@@ -6,6 +6,8 @@ PRs are welcomed! To get started developing:
 3. Run `npm start` to run the server
 4. Run `npm test` to run tests with Jest
 
+You can run `FILL_DEMO=true npm run test -- 'test/demo.test.ts'` to populate sample data into your locally running server.
+
 ## Releases
 
 Versions follow the [semantic versioning spec](https://semver.org/).
