@@ -14,10 +14,15 @@ const handler: RequestHandler = async (req, res) => {
   const messageId = `ses-${Math.floor(Math.random() * 900000000 + 100000000)}`;
 
   const message = await simpleParser(Buffer.from(req.body['RawMessage.Data'], 'base64'));
+  const from = message.from?.text ?? req.body.Source;
+  if (!from) {
+    res.status(400).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Missing source or from value' });
+    return;
+  }
 
   store.emails.push({
     messageId,
-    from: message.from?.text ?? req.body.Source,
+    from,
     replyTo: message.replyTo ? [message.replyTo.text] : [],
     destination: {
       to: (Array.isArray(message.to) ? message.to : [message.to || null]).filter((m): m is AddressObject => !!m).map((a) => a.text),
