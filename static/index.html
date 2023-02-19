@@ -242,7 +242,7 @@
                     ${e.body.html ? `<button onclick="toggle('${e.messageId}-html')">Toggle HTML view</button>` : ''}
                     
                     ${e.body.text ? `<div class="email-text" id="${e.messageId}-text" style="display: none">${escape(e.body.text)}</div>` : ''}
-                    ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none"><iframe id="${e.messageId}-html-iframe"></iframe></div>` : ''}
+                    ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none"><iframe id="${e.messageId}-html-iframe" src="javascript:void(0);"></iframe></div>` : ''}
                     </div>`
 
                     document.getElementById('content').prepend(node)
