@@ -1,5 +1,5 @@
 # This file is centrally managed
-# https://github.com/domdomegg/domdomegg/blob/master/file-sync/general.yaml
+# https://github.com/domdomegg/domdomegg/blob/master/file-sync/node-general.yaml
 
 name: CI/CD
 
@@ -11,7 +11,9 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        node-version: [lts/*, current]
+        # Pinned version is a workaround for
+        # https://github.com/actions/setup-node/issues/714
+        node-version: [lts/*, '19.8.0']
     env:
       CI: true
     steps:
