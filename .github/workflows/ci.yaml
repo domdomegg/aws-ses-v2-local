@@ -11,9 +11,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        # Pinned version is a workaround for
-        # https://github.com/actions/setup-node/issues/714
-        node-version: [lts/*, '19.8.0']
+        node-version: [lts/*, current]
     env:
       CI: true
     steps:
