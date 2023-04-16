@@ -8,7 +8,7 @@ import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
 import v2GetAccount from './v2/getAccount';
 import v2SendEmail from './v2/sendEmail';
 import v2SendBulkEmail from './v2/sendBulkEmail';
-import store from './store';
+import { getStoreReadonly } from './store';
 
 export interface Config {
   host: string,
@@ -35,6 +35,8 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
   });
 
   app.get('/store', (req, res) => {
+    const store = getStoreReadonly();
+
     if (!req.query.since) {
       res.status(200).send(store);
       return;

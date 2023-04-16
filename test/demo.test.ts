@@ -3,9 +3,12 @@ import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 const baseURL = 'http://localhost:8005';
 
 // Purpose: Run this when you want to populate the web front-end with sample data, e.g. for demo screenshots
-test.skip('send emails for demo', async () => {
+// npm start
+// npm test -- demo.test.ts
+test('send emails for demo', async () => {
   const ses = new SESv2Client({
     endpoint: baseURL,
+    region: 'ANY_REGION',
     credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
   });
 

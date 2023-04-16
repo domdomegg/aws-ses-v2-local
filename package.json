@@ -36,6 +36,7 @@
     "@types/jest": "^27.0.2",
     "@types/json-schema": "^7.0.9",
     "@types/mailparser": "^3.4.0",
+    "@types/nodemailer": "^6.4.7",
     "@typescript-eslint/eslint-plugin": "^5.3.0",
     "@typescript-eslint/parser": "^5.3.0",
     "axios": "^0.27.2",
@@ -54,7 +55,6 @@
   "dependencies": {
     "ajv": "^8.6.3",
     "express": "^4.17.1",
-    "html-entities": "^2.3.3",
     "mailparser": "^3.4.0",
     "nodemailer": "^6.8.0",
     "yargs": "^17.6.0"

@@ -1,3 +1,5 @@
+import { sendEmailToSmtp } from './smtp';
+
 export interface Store {
   emails: Email[],
   templates: Map<string, Template>,
@@ -35,4 +37,17 @@ const store: Store = {
   templates: new Map(),
 };
 
-export default store;
+export const saveEmail = (email: Email) => {
+  store.emails.push(email);
+  sendEmailToSmtp(email);
+};
+
+export const hasTemplate = store.templates.has;
+export const getTemplate = store.templates.get;
+export const setTemplate = store.templates.set;
+export const deleteTemplate = store.templates.delete;
+
+// This type doesn't give us perfect readonly safety
+// But this is probably safe enough for now, given the method name
+// and the relatively small project size.
+export const getStoreReadonly = (): Readonly<Store> => store;

@@ -1,5 +1,5 @@
-import store from '../src/store';
+import { getStoreReadonly } from '../src/store';
 
 test('store.emails starts off empty', () => {
-  expect(store.emails).toHaveLength(0);
+  expect(getStoreReadonly().emails).toHaveLength(0);
 });

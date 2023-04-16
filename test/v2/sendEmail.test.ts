@@ -56,35 +56,30 @@ test('can send email with v2 API', async () => {
     url: '/store',
   })).data;
 
-  expect(s).toMatchInlineSnapshot({
-    emails: [
-      {
-        at: expect.any(Number),
-        messageId: expect.any(String),
-      },
-    ],
-  }, `
-Object {
-  "emails": Array [
-    Object {
-      "at": Any<Number>,
-      "attachments": Array [],
-      "body": Object {
-        "text": "This is the email contents",
-      },
-      "destination": Object {
-        "bcc": Array [],
-        "cc": Array [],
-        "to": Array [
-          "receiver@example.com",
-        ],
-      },
-      "from": "sender@example.com",
-      "messageId": Any<String>,
-      "replyTo": Array [],
-      "subject": "This is the subject",
+  expect(s.emails).toMatchInlineSnapshot(
+    [
+      { at: expect.any(Number),
+        messageId: expect.any(String) }], `
+Array [
+  Object {
+    "at": Any<Number>,
+    "attachments": Array [],
+    "body": Object {
+      "text": "This is the email contents",
     },
-  ],
-}
-`);
+    "destination": Object {
+      "bcc": Array [],
+      "cc": Array [],
+      "to": Array [
+        "receiver@example.com",
+      ],
+    },
+    "from": "sender@example.com",
+    "messageId": Any<String>,
+    "replyTo": Array [],
+    "subject": "This is the subject",
+  },
+]
+`,
+  );
 });

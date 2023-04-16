@@ -1,9 +1,8 @@
 import type { RequestHandler } from 'express';
 import type { JSONSchema7 } from 'json-schema';
 import ajv from '../ajv';
-import store from '../store';
 
-const handler: RequestHandler = (req, res, next) => {
+const handler: RequestHandler = (req, res) => {
   if (!process.env.AWS_SES_ACCOUNT) {
     res.status(400).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Account not found' });
     return;
@@ -15,7 +14,7 @@ const handler: RequestHandler = (req, res, next) => {
     return;
   }
 
-  res.status(200).send(account)
+  res.status(200).send(account);
 };
 
 export default handler;

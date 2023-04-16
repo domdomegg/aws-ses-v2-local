@@ -1,16 +1,16 @@
 import type { RequestHandler } from 'express';
-import store from '../store';
+import { hasTemplate, deleteTemplate } from '../store';
 
-const handler: RequestHandler = (req, res, next) => {
+const handler: RequestHandler = (req, res) => {
   const templateName: string = req.params.TemplateName;
 
   // Check if the template already exists.
-  if (!store.templates.has(templateName)) {
+  if (!hasTemplate(templateName)) {
     res.status(404).send({ type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.' });
     return;
   }
 
-  store.templates.delete(templateName);
+  deleteTemplate(templateName);
   res.status(200).send();
 };
 

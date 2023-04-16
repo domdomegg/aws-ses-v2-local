@@ -1,11 +1,8 @@
 import type { RequestHandler } from 'express';
 import type { JSONSchema7 } from 'json-schema';
-import { AddressObject, simpleParser } from 'mailparser';
-import { encode } from 'html-entities';
 import ajv from '../ajv';
-import { sendEmail } from '../send';
-import store from '../store';
-import { Email, Template } from '../store';
+import { Email, getTemplate, hasTemplate, saveEmail } from '../store';
+import isEmailValid from '../isEmailValid';
 
 interface Replacement {
   Name: string;
@@ -58,7 +55,7 @@ const handler: RequestHandler = (req, res, next) => {
     return;
   }
   handleBulk(req, res, next);
-}
+};
 
 const handleBulk: RequestHandler = async (req, res) => {
   const body = req.body as unknown as BulkEmailBody;
@@ -74,12 +71,12 @@ const handleBulk: RequestHandler = async (req, res) => {
 
   // Try to retrieve the template.
   const templateName = defaultContent.Template.TemplateName;
-  if (!store.templates.has(templateName)) {
-    res.status(400).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Unable to find the template: ' + templateName + '.' });
+  if (!hasTemplate(templateName)) {
+    res.status(400).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Unable to find the template: ${templateName}.` });
     return;
   }
 
-  const template = store.templates.get(templateName);
+  const template = getTemplate(templateName);
   const templateSubject = template?.TemplateContent.Subject ?? '';
   const templateHtml = template?.TemplateContent.Html ?? '';
   const templateText = template?.TemplateContent.Text ?? '';
@@ -90,10 +87,11 @@ const handleBulk: RequestHandler = async (req, res) => {
   const results: BulkEmailResult[] = [];
   // Process each destination.
   body.BulkEmailEntries.forEach((entry, index) => {
-    const messageId: string = `ses-${Math.floor(Math.random() * 900000000 + 100000000 + index)}`;
+    const messageId = `ses-${Math.floor(Math.random() * 900000000 + 100000000 + index)}`;
 
     // Validate destination email address.
-    if (!validateEmailAddresses(entry.Destination.ToAddresses)) {
+    const allEmails = [...entry.Destination.ToAddresses, ...entry.Destination.CcAddresses ?? [], ...entry.Destination.BccAddresses ?? []];
+    if (!allEmails.every(isEmailValid)) {
       results.push({
         MessageId: messageId,
         Error: 'Invalid recipient email address(es)',
@@ -116,20 +114,16 @@ const handleBulk: RequestHandler = async (req, res) => {
         cc: entry.Destination?.CcAddresses ?? [],
         bcc: entry.Destination?.BccAddresses ?? [],
       },
-      subject: subject,
+      subject,
       body: {
-        html: html,
-        text: text,
+        html,
+        text,
       },
       attachments: [],
       at: Math.floor(new Date().getTime() / 1000),
     };
 
-    // Store the email so it can be retrieve via the API or seen via the UI.
-    store.emails.push(email);
-
-    // Attempt to send the email.
-    sendEmail(email);
+    saveEmail(email);
 
     results.push({
       MessageId: messageId,
@@ -139,20 +133,6 @@ const handleBulk: RequestHandler = async (req, res) => {
 
   res.status(200).send({ BulkEmailEntryResults: results });
 };
-
-/**
- * Simple email address validation.
- *
- * @todo Add more proper validation.
- */
-function validateEmailAddresses(addresses: string[]): boolean {
-  for (const address of addresses) {
-    if (address.indexOf('@') === -1) {
-      return false;
-    }
-  }
-  return true;
-}
 
 /**
  * Decode template data.
@@ -166,13 +146,14 @@ function decodeTemplateData(templateData?: string): Replacement[] {
  * Replace template data.
  */
 function replaceTemplateData(content: string, replacements: Replacement[] = [], defaultReplacements: Replacement[] = []): string {
-  replacements.forEach(item => {
-    content = content.replaceAll('{{' + item.Name + '}}', item.Value);
+  let newContent = content;
+  replacements.forEach((item) => {
+    newContent = newContent.replaceAll(`{{${item.Name}}}`, item.Value);
   });
-  defaultReplacements.forEach(item => {
-    content = content.replaceAll('{{' + item.Name + '}}', item.Value);
+  defaultReplacements.forEach((item) => {
+    newContent = newContent.replaceAll(`{{${item.Name}}}`, item.Value);
   });
-  return content;
+  return newContent;
 }
 
 export default handler;
@@ -229,9 +210,9 @@ const sendBulkEmailRequestSchema: JSONSchema7 = {
         Template: {
           type: 'object',
           properties: {
-              TemplateArn: { type: 'string' },
-              TemplateData: { type: 'string' },
-              TemplateName: { type: 'string' },
+            TemplateArn: { type: 'string' },
+            TemplateData: { type: 'string' },
+            TemplateName: { type: 'string' },
           },
           required: ['TemplateName'],
         },

@@ -28,7 +28,7 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 - Health check endpoint at `GET /health-check`
 - Control it from the CLI, or import it as a library
 - TypeScript definitions
-- Emails can be forwarded to a SMTP server via the SMPT_TRANSPORT env variable (see https://nodemailer.com/smtp/)
+- Emails can be forwarded to a SMTP server via the SMTP_TRANSPORT env variable
 
 ## Install
 

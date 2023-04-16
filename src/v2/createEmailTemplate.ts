@@ -1,10 +1,9 @@
 import type { RequestHandler } from 'express';
 import type { JSONSchema7 } from 'json-schema';
 import ajv from '../ajv';
-import store from '../store';
-import { Template } from '../store';
+import { hasTemplate, setTemplate, Template } from '../store';
 
-const handler: RequestHandler = (req, res, next) => {
+const handler: RequestHandler = (req, res) => {
   const valid = validate(req.body);
   if (!valid) {
     res.status(404).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed' });
@@ -14,12 +13,12 @@ const handler: RequestHandler = (req, res, next) => {
   const template: Template = req.body;
 
   // Check if the template already exists.
-  if (store.templates.has(template.TemplateName)) {
+  if (hasTemplate(template.TemplateName)) {
     res.status(400).send({ type: 'AlreadyExistsException', message: 'The resource specified in your request already exists.' });
     return;
   }
 
-  store.templates.set(template.TemplateName, template);
+  setTemplate(template.TemplateName, template);
   res.status(200).send();
 };
 
