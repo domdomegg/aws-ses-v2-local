@@ -7,6 +7,7 @@ const baseURL = 'http://localhost:8005';
 (process.env.FILL_DEMO ? test : test.skip)('send emails for demo', async () => {
   const ses = new SESv2Client({
     endpoint: baseURL,
+    region: 'ANY_REGION',
     credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
   });
 

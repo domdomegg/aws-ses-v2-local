@@ -2,7 +2,7 @@ import type { RequestHandler } from 'express';
 import type { JSONSchema7 } from 'json-schema';
 import { AddressObject, simpleParser } from 'mailparser';
 import ajv from '../ajv';
-import store from '../store';
+import { saveEmail } from '../store';
 
 const handler: RequestHandler = async (req, res) => {
   const valid = validate(req.body);
@@ -20,7 +20,7 @@ const handler: RequestHandler = async (req, res) => {
     return;
   }
 
-  store.emails.push({
+  saveEmail({
     messageId,
     from,
     replyTo: message.replyTo ? [message.replyTo.text] : [],

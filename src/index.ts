@@ -3,14 +3,20 @@ import express from 'express';
 import path from 'path';
 import v1SendRawEmail from './v1/sendRawEmail';
 import v1SendEmail from './v1/sendEmail';
+import v2CreateEmailTemplate from './v2/createEmailTemplate';
+import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
+import v2GetAccount from './v2/getAccount';
 import v2SendEmail from './v2/sendEmail';
-import store from './store';
+import v2SendBulkEmail from './v2/sendBulkEmail';
+import { getStoreReadonly, clearStore } from './store';
 
 export interface Config {
+  host: string,
   port: number,
 }
 
 export const defaultConfig: Config = {
+  host: 'localhost',
   port: 8005,
 };
 
@@ -29,11 +35,13 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
   });
 
   app.post('/clear-store', (req, res) => {
-    store.emails = [];
-    res.status(200).send({ message: 'Emails cleared' });
+    clearStore();
+    res.status(200).send({ message: 'Store cleared' });
   });
 
   app.get('/store', (req, res) => {
+    const store = getStoreReadonly();
+
     if (!req.query.since) {
       res.status(200).send(store);
       return;
@@ -73,14 +81,23 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
     if (req.body.Action === 'SendRawEmail') v1SendRawEmail(req, res, next);
   });
 
+  // SES V2 - template handling.
+  app.post('/v2/email/templates', v2CreateEmailTemplate);
+  app.delete('/v2/email/templates/:TemplateName', v2DeleteEmailTemplate);
+
+  // SES V2 - account handling.
+  app.get('/v2/email/account', v2GetAccount);
+
+  // SES V2 - email sending.
   app.post('/v2/email/outbound-emails', v2SendEmail);
+  app.post('/v2/email/outbound-bulk-emails', v2SendBulkEmail);
 
   app.use((req, res) => {
     res.status(404).send('<UnknownOperationException/>');
   });
 
   return new Promise((resolve) => {
-    const s = app.listen(config.port, () => resolve(s));
+    const s = app.listen(config.port, config.host, () => resolve(s));
   });
 };
 

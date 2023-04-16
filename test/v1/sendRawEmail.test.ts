@@ -71,21 +71,12 @@ Content-Transfer-Encoding: 8bit
     url: '/store',
   })).data;
 
-  expect(s).toMatchInlineSnapshot({
-    emails: [
-      {
-        at: expect.any(Number),
-        messageId: expect.any(String),
-      }],
-
-  }, `
-{
-  "emails": [
+  expect(s.emails).toMatchObject([
     {
-      "at": Any<Number>,
-      "attachments": [],
-      "body": {
-        "html": "<html lang="en">
+      at: expect.any(Number),
+      attachments: [],
+      body: {
+        html: `<html lang="en">
 <head title="">
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 </head>
@@ -94,23 +85,20 @@ Content-Transfer-Encoding: 8bit
 <div><span></span></div>
 </body>
 </html>
-",
-        "text": "html email test
-",
+`,
+        text: 'html email test\n',
       },
-      "destination": {
-        "bcc": [],
-        "cc": [],
-        "to": [
-          "someone <someone@example.com>",
+      destination: {
+        bcc: [],
+        cc: [],
+        to: [
+          'someone <someone@example.com>',
         ],
       },
-      "from": "You <you@yourapp.com>",
-      "messageId": Any<String>,
-      "replyTo": [],
-      "subject": "Test email sent to aws-ses-v2-local!",
+      from: 'You <you@yourapp.com>',
+      messageId: expect.any(String),
+      replyTo: [],
+      subject: 'Test email sent to aws-ses-v2-local!',
     },
-  ],
-}
-`);
+  ]);
 });

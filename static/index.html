@@ -170,7 +170,7 @@
         <h1>aws-ses-v2-local viewer</h1>
         <button onclick="changeTheme()">Change theme</button>
         &nbsp;
-        <button onclick="clearEmails()">Clear</button>
+        <button onclick="clearStore()">Clear</button>
     </div>
     <noscript>
         <div class="error">
@@ -295,8 +295,8 @@
             }, 500)
         }
 
-        const clearEmails = async () => {
-            await fetch({ method: 'post', url: `/clear-store` });
+        const clearStore = async () => {
+            await fetch('/clear-store', { method: 'post' });
             location.reload();
         }
 
