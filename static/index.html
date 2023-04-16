@@ -43,7 +43,7 @@
         /* General styles */
 
         html {
-            font-family: sans-serif;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
             margin: 1em 2em 2em 2em;
             color: var(--color);
             background: var(--background)
@@ -169,6 +169,8 @@
     <div class="title">
         <h1>aws-ses-v2-local viewer</h1>
         <button onclick="changeTheme()">Change theme</button>
+        &nbsp;
+        <button onclick="clearStore()">Clear</button>
     </div>
     <noscript>
         <div class="error">
@@ -240,7 +242,7 @@
                     ${e.body.html ? `<button onclick="toggle('${e.messageId}-html')">Toggle HTML view</button>` : ''}
                     
                     ${e.body.text ? `<div class="email-text" id="${e.messageId}-text" style="display: none">${escape(e.body.text)}</div>` : ''}
-                    ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none"><iframe id="${e.messageId}-html-iframe"></iframe></div>` : ''}
+                    ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none"><iframe id="${e.messageId}-html-iframe" src="javascript:void(0);"></iframe></div>` : ''}
                     </div>`
 
                     document.getElementById('content').prepend(node)
@@ -291,6 +293,11 @@
             window.setTimeout(function () {
                 document.documentElement.classList.remove(themeChangeClass)
             }, 500)
+        }
+
+        const clearStore = async () => {
+            await fetch('/clear-store', { method: 'post' });
+            location.reload();
         }
 
         let theme = getTheme()

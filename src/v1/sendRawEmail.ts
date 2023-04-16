@@ -14,10 +14,15 @@ const handler: RequestHandler = async (req, res) => {
   const messageId = `ses-${Math.floor(Math.random() * 900000000 + 100000000)}`;
 
   const message = await simpleParser(Buffer.from(req.body['RawMessage.Data'], 'base64'));
+  const from = message.from?.text ?? req.body.Source;
+  if (!from) {
+    res.status(400).send({ message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Missing source or from value' });
+    return;
+  }
 
   saveEmail({
     messageId,
-    from: message.from?.text ?? req.body.Source,
+    from,
     replyTo: message.replyTo ? [message.replyTo.text] : [],
     destination: {
       to: (Array.isArray(message.to) ? message.to : [message.to || null]).filter((m): m is AddressObject => !!m).map((a) => a.text),
@@ -27,6 +32,7 @@ const handler: RequestHandler = async (req, res) => {
     subject: message.subject ?? '(no subject)',
     body: {
       text: message.text,
+      html: message.html || undefined,
     },
     attachments: message.attachments.map((a) => ({ ...a, content: a.content.toString('base64') })),
     at: Math.floor(new Date().getTime() / 1000),
@@ -52,7 +58,7 @@ const sendRawEmailRequestSchema: JSONSchema7 = {
     SourceArn: { type: 'string' },
     'Tags.member.1': { type: 'string' },
   },
-  required: ['Action', 'Source', 'RawMessage.Data'],
+  required: ['Action', 'RawMessage.Data'],
 };
 
 const validate = ajv.compile(sendRawEmailRequestSchema);

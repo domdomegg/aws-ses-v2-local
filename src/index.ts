@@ -8,7 +8,7 @@ import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
 import v2GetAccount from './v2/getAccount';
 import v2SendEmail from './v2/sendEmail';
 import v2SendBulkEmail from './v2/sendBulkEmail';
-import { getStoreReadonly } from './store';
+import { getStoreReadonly, clearStore } from './store';
 
 export interface Config {
   host: string,
@@ -32,6 +32,11 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
 
   app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../static/index.html'));
+  });
+
+  app.post('/clear-store', (req, res) => {
+    clearStore();
+    res.status(200).send({ message: 'Store cleared' });
   });
 
   app.get('/store', (req, res) => {
