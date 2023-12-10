@@ -121,16 +121,21 @@
         }
 
         .email-text,
-        .email-html {
+        .email-html,
+        .email-source {
             margin-top: 0.75em;
         }
 
-        .email-text {
+        .email-text, .email-source {
             white-space: pre-line;
             border: 1px solid var(--borders);
             border-radius: 0.5em;
             padding: 20px;
             background: var(--background-inset);
+        }
+
+        .email-source {
+            font-family: 'Consolas', monospace;
         }
 
         .email-html iframe {
@@ -240,9 +245,11 @@
                     
                     ${e.body.text ? `<button onclick="toggle('${e.messageId}-text')">Toggle text view</button>` : ''}
                     ${e.body.html ? `<button onclick="toggle('${e.messageId}-html')">Toggle HTML view</button>` : ''}
+                    ${e.body.html ? `<button onclick="toggle('${e.messageId}-source')">Toggle HTML source view</button>` : ''}
                     
                     ${e.body.text ? `<div class="email-text" id="${e.messageId}-text" style="display: none">${escape(e.body.text)}</div>` : ''}
                     ${e.body.html ? `<div class="email-html" id="${e.messageId}-html" style="display: none"><iframe id="${e.messageId}-html-iframe" src="javascript:void(0);"></iframe></div>` : ''}
+                    ${e.body.html ? `<div class="email-source" id="${e.messageId}-source" style="display: none">${escape(e.body.html)}</div>` : ''}
                     </div>`
 
                     document.getElementById('content').prepend(node)
