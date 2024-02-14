@@ -42,10 +42,10 @@ export const saveEmail = (email: Email) => {
   sendEmailToSmtp(email);
 };
 
-export const hasTemplate = store.templates.has;
-export const getTemplate = store.templates.get;
-export const setTemplate = store.templates.set;
-export const deleteTemplate = store.templates.delete;
+export const hasTemplate = (key: string) => store.templates.has(key);
+export const getTemplate = (key: string) => store.templates.get(key);
+export const setTemplate = (key: string, value: Template) => store.templates.set(key, value);
+export const deleteTemplate = (key: string) => store.templates.delete(key);
 
 export const clearStore = () => {
   store.emails = [];
