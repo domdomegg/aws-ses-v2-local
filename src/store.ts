@@ -1,4 +1,5 @@
 import { sendEmailToSmtp } from './smtp';
+import { MailOptions } from 'nodemailer/lib/sendmail-transport';
 
 export interface Store {
   emails: Email[],
@@ -56,3 +57,16 @@ export const clearStore = () => {
 // But this is probably safe enough for now, given the method name
 // and the relatively small project size.
 export const getStoreReadonly = (): Readonly<Store> => store;
+
+export const convertToMailOptions = (email: Email): MailOptions => ({
+  from: email.from,
+  replyTo: email.replyTo,
+  to: email.destination.to,
+  cc: email.destination.cc,
+  bcc: email.destination.bcc,
+  subject: email.subject,
+  html: email.body.html,
+  text: email.body.text,
+  attachments: email.attachments,
+  date: new Date(email.at * 1000)
+});
