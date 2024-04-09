@@ -8,7 +8,8 @@ import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
 import v2GetAccount from './v2/getAccount';
 import v2SendEmail from './v2/sendEmail';
 import v2SendBulkEmail from './v2/sendBulkEmail';
-import { getStoreReadonly, clearStore } from './store';
+import { getStoreReadonly, clearStore, Email } from './store';
+import { createEmlContent } from './emlFile';
 
 export interface Config {
   host: string,
@@ -61,6 +62,27 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
 
   app.get('/health-check', (req, res) => {
     res.status(200).send();
+  });
+  
+  app.get('/get-emlContent', (req, res) => {
+    const store = getStoreReadonly();
+
+    if (typeof req.query.messageId !== 'string' || req.query.messageId === '') {
+      res.status(400).send({ message: 'Bad since query param, expected single value' });
+    }
+
+    const messageId = req.query.messageId as string;
+    const email = store.emails.find(e => e.messageId === messageId);
+
+    if (email === undefined) {
+      res.status(400).send({ message: 'Email not found within the store' })
+    }
+
+    createEmlContent(email as Email).then((result) => {
+      res.status(200).send(result);
+    }).catch((result) => {
+      res.status(400).send({ message: result.error });
+    });
   });
 
   app.use((req, res, next) => {
