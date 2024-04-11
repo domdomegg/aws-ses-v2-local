@@ -24,7 +24,7 @@ test('can get eml content', async () => {
     url: '/store',
   })).data;
   expect(storeWithEmails.emails).toHaveLength(1);
-  const messageId = storeWithEmails.emails[0].messageId;
+  const { messageId } = storeWithEmails.emails[0];
 
   const c: CreateEmlContentResult = (await axios({
     method: 'get',
@@ -33,11 +33,11 @@ test('can get eml content', async () => {
   })).data;
 
   expect(c).toMatchObject({
-    messageId: messageId,
+    messageId,
     fileName: 'This is the subject',
     body: {
-      type: "Buffer",
-      data: expect.any(Array<String>),
-    }
+      type: 'Buffer',
+      data: expect.any(Array<string>),
+    },
   });
 });

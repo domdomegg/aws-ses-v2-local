@@ -1,15 +1,14 @@
-import { createTransport, Transporter } from "nodemailer";
-import { convertToMailOptions, Email } from "./store";
+import { createTransport, Transporter } from 'nodemailer';
+import { Buffer } from 'buffer';
+import { convertToMailOptions, Email } from './store';
 
 export interface CreateEmlContentResult {
   messageId: string,
-  error?: string,
   fileName: string,
-  body: string
+  body: Buffer
 }
 
-export const createEmlContent = async (email: Email): Promise<CreateEmlContentResult> => {
-
+export const createEmlContent = async (email: Email): Promise<CreateEmlContentResult | Error> => {
   const transporter: Transporter = createTransport({
     streamTransport: true,
     buffer: true,
@@ -20,8 +19,8 @@ export const createEmlContent = async (email: Email): Promise<CreateEmlContentRe
       if (!error) {
         resolve({ messageId: email.messageId, fileName: email.subject, body: info.message });
       } else {
-        reject({ messageId: email.messageId, error: `failed to create eml file content, ${error.message}` });
+        reject(error);
       }
     });
-  })
+  });
 };
