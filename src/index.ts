@@ -63,7 +63,7 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
   app.get('/health-check', (req, res) => {
     res.status(200).send();
   });
-  
+
   app.get('/get-emlContent', (req, res) => {
     const store = getStoreReadonly();
 
@@ -72,10 +72,10 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
     }
 
     const messageId = req.query.messageId as string;
-    const email = store.emails.find(e => e.messageId === messageId);
+    const email = store.emails.find((e) => e.messageId === messageId);
 
     if (email === undefined) {
-      res.status(400).send({ message: 'Email not found within the store' })
+      res.status(400).send({ message: 'Email not found within the store' });
     }
 
     createEmlContent(email as Email).then((result) => {

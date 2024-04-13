@@ -1,5 +1,5 @@
-import { sendEmailToSmtp } from './smtp';
 import { MailOptions } from 'nodemailer/lib/sendmail-transport';
+import { sendEmailToSmtp } from './smtp';
 
 export interface Store {
   emails: Email[],
@@ -68,5 +68,5 @@ export const convertToMailOptions = (email: Email): MailOptions => ({
   html: email.body.html,
   text: email.body.text,
   attachments: email.attachments,
-  date: new Date(email.at * 1000)
+  date: new Date(email.at * 1000),
 });
