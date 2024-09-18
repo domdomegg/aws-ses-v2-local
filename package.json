@@ -26,7 +26,9 @@
     "lint": "eslint",
     "clean": "rm -rf dist",
     "build": "tsc --project tsconfig.build.json",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "npm run clean && npm run build",
+    "build:docker": "docker build -t $DOCKER_IMAGE .",
+    "publish:docker": "docker push $DOCKER_IMAGE"
   },
   "devDependencies": {
     "@aws-sdk/client-ses": "^3.204.0",
