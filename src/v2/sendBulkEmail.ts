@@ -82,7 +82,8 @@ const handleBulk: RequestHandler = async (req, res) => {
   const templateText = template?.TemplateContent.Text ?? '';
 
   // Default template replacement data.
-  const defaultTemplateData = decodeTemplateData(defaultContent.Template?.TemplateData);
+  const [defaultTemplateData, err]= decodeTemplateData(defaultContent.Template?.TemplateData);
+  if(err) return res.status(400).send(err);
 
   const results: BulkEmailResult[] = [];
   // Process each destination.
@@ -100,7 +101,8 @@ const handleBulk: RequestHandler = async (req, res) => {
       return;
     }
 
-    const templateData = decodeTemplateData(entry.ReplacementEmailContent?.ReplacementTemplate?.ReplacementTemplateData);
+    const [templateData,err] = decodeTemplateData(entry.ReplacementEmailContent?.ReplacementTemplate?.ReplacementTemplateData);
+    if(err) return res.status(400).send(err);
     const subject = replaceTemplateData(templateSubject, templateData, defaultTemplateData);
     const html = replaceTemplateData(templateHtml, templateData, defaultTemplateData);
     const text = replaceTemplateData(templateText, templateData, defaultTemplateData);
@@ -137,9 +139,15 @@ const handleBulk: RequestHandler = async (req, res) => {
 /**
  * Decode template data.
  */
-function decodeTemplateData(templateData?: string): Replacement[] {
-  const result = templateData ? JSON.parse(templateData) : [];
-  return result ?? [];
+function decodeTemplateData(templateData?: string): [Replacement[], string] {
+  let err = '';
+  var result;
+  try{
+    result = templateData ? Object.entries(JSON.parse(templateData)).map(r=>({Name:r[0].toString(),Value:(typeof r[1] === 'string'?r[1]:err+=`Invalid replacement data Found in key ${r[0]}\n`)})) : [];
+  }catch(e){
+    err="Failed to Parse replacements"+e;
+  }
+  return [result ?? [], err];
 }
 
 /**
