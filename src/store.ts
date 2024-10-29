@@ -6,6 +6,11 @@ export interface Store {
   templates: Map<string, Template>,
 }
 
+export interface StoreReadOnly {
+  emails: Email[],
+  templates: {[key: string]: Template},
+}
+
 export interface Email {
   messageId: string,
   from: string,
@@ -56,7 +61,7 @@ export const clearStore = () => {
 // This type doesn't give us perfect readonly safety
 // But this is probably safe enough for now, given the method name
 // and the relatively small project size.
-export const getStoreReadonly = (): Readonly<Store> => store;
+export const getStoreReadonly = (): Readonly<StoreReadOnly> => ({emails:store.emails, templates:Object.fromEntries(store.templates)});
 
 export const convertToMailOptions = (email: Email): MailOptions => ({
   from: email.from,
