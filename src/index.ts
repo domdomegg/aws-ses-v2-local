@@ -44,7 +44,7 @@ const server = (partialConfig: Partial<Config> = {}): Promise<Server> => {
     const store = getStoreReadonly();
 
     if (!req.query.since) {
-      res.status(200).send(store);
+      res.status(200).send({ emails: store.emails, templates: Object.fromEntries(store.templates) });
       return;
     }
 
