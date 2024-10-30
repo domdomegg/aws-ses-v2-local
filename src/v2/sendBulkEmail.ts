@@ -25,7 +25,7 @@ interface BulkEmailDefaultContent {
 
 interface BulkEmailEntry {
   Destination: {
-    BccAddresses?: string [];
+    BccAddresses?: string[];
     CcAddresses?: string[];
     ToAddresses: string[];
   };
@@ -83,6 +83,10 @@ const handleBulk: RequestHandler = async (req, res) => {
 
   // Default template replacement data.
   const defaultTemplateData = decodeTemplateData(defaultContent.Template?.TemplateData);
+  if (defaultTemplateData instanceof Error) {
+    res.status(400).send(defaultTemplateData);
+    return;
+  }
 
   const results: BulkEmailResult[] = [];
   // Process each destination.
@@ -101,6 +105,10 @@ const handleBulk: RequestHandler = async (req, res) => {
     }
 
     const templateData = decodeTemplateData(entry.ReplacementEmailContent?.ReplacementTemplate?.ReplacementTemplateData);
+    if (templateData instanceof Error) {
+      res.status(400).send(templateData);
+      return;
+    }
     const subject = replaceTemplateData(templateSubject, templateData, defaultTemplateData);
     const html = replaceTemplateData(templateHtml, templateData, defaultTemplateData);
     const text = replaceTemplateData(templateText, templateData, defaultTemplateData);
@@ -137,9 +145,20 @@ const handleBulk: RequestHandler = async (req, res) => {
 /**
  * Decode template data.
  */
-function decodeTemplateData(templateData?: string): Replacement[] {
-  const result = templateData ? JSON.parse(templateData) : [];
-  return result ?? [];
+const decodeTemplateData = (templateData?: string): (Replacement[] | Error) => {
+  let err = '';
+  let result;
+  try {
+    // Template data is passed in as a JSON string that contains key-value pairs. The keys correspond to the variables in the template and values represent the content that replaces the variables in the email. https://docs.aws.amazon.com/ses/latest/dg/send-personalized-email-api.html  https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_Template.html
+    // eg. '{"name":"John Doe"}' as templateData with template 'Hello {{name}}' would result in 'Hello John Doe'
+    result = templateData ? Object.entries(JSON.parse(templateData)).map((r) => ({
+      Name: r[0],
+      Value: (typeof r[1] === 'string' ? r[1] : (err += `Invalid replacement data Found in key ${r[0]}\n`)),
+    })) : [];
+  } catch (e) {
+    err += `Failed to Parse replacements ${e}`;
+  }
+  return err ? new Error(err) : result ?? [];
 }
 
 /**
