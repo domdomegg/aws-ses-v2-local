@@ -144,22 +144,37 @@ const handleBulk: RequestHandler = async (req, res) => {
 
 /**
  * Decode template data.
+ *
+ * Template data is passed in as a JSON string that contains key-value pairs. The keys correspond to the variables in the template and values represent the content that replaces the variables in the email. https://docs.aws.amazon.com/ses/latest/dg/send-personalized-email-api.html  https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_Template.html
+ * eg. '{"name":"John Doe"}' as templateData with template 'Hello {{name}}' would result in 'Hello John Doe'
  */
-const decodeTemplateData = (templateData?: string): (Replacement[] | Error) => {
-  let err = '';
-  let result;
+const decodeTemplateData = (templateData = '{}'): Replacement[] | Error => {
   try {
-    // Template data is passed in as a JSON string that contains key-value pairs. The keys correspond to the variables in the template and values represent the content that replaces the variables in the email. https://docs.aws.amazon.com/ses/latest/dg/send-personalized-email-api.html  https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_Template.html
-    // eg. '{"name":"John Doe"}' as templateData with template 'Hello {{name}}' would result in 'Hello John Doe'
-    result = templateData ? Object.entries(JSON.parse(templateData)).map((r) => ({
-      Name: r[0],
-      Value: (typeof r[1] === 'string' ? r[1] : (err += `Invalid replacement data Found in key ${r[0]}\n`)),
-    })) : [];
-  } catch (e) {
-    err += `Failed to Parse replacements ${e}`;
+    const parsed = JSON.parse(templateData);
+    const errors: string[] = [];
+    const replacements: Replacement[] = [];
+
+    Object.entries(parsed).forEach(([key, value]) => {
+      if (typeof value !== 'string') {
+        errors.push(`Invalid replacement data found in key "${key}": expected string, got ${typeof value}`);
+        return;
+      }
+
+      replacements.push({
+        Name: key,
+        Value: value,
+      });
+    });
+
+    if (errors.length > 0) {
+      return new Error(`Template validation failed:\n${errors.join('\n')}`);
+    }
+
+    return replacements;
+  } catch (error) {
+    return new Error(`Failed to parse template data: ${error}`);
   }
-  return err ? new Error(err) : result ?? [];
-}
+};
 
 /**
  * Replace template data.
