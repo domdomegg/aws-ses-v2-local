@@ -270,8 +270,16 @@ const sendBulkEmailRequestSchema: JSONSchema7 = {
             TemplateArn: { type: 'string' },
             TemplateData: { type: 'string' },
             TemplateName: { type: 'string' },
+            TemplateContent: {
+              type: 'object',
+              properties: {
+                Subject: { type: 'string' },
+                Html: { type: 'string' },
+                Text: { type: 'string' },
+              },
+              required: ['Subject'],
+            },
           },
-          required: ['TemplateName'],
         },
       },
       required: ['Template'],
