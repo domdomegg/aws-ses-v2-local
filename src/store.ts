@@ -17,10 +17,10 @@ export type Email = {
 	};
 	subject: string;
 	body: {
-		html?: string;
-		text?: string;
+		html?: string | undefined;
+		text?: string | undefined;
 	};
-	attachments: {content: string; contentType: string; filename?: string; size: number}[];
+	attachments: {content: string; contentType: string; filename?: string | undefined; size: number}[];
 	at: number;
 };
 

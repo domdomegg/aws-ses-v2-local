@@ -1,6 +1,6 @@
 import type {RequestHandler} from 'express';
-import type {JSONSchema7} from 'json-schema';
 import ajv from '../ajv';
+import {type JSONSchemaType} from 'ajv';
 import {
 	type Email, getTemplate, hasTemplate, saveEmail,
 } from '../store';
@@ -220,7 +220,7 @@ function replaceTemplateData(content: string, replacements: Replacement[] = [], 
 
 export default handler;
 
-const sendBulkEmailRequestSchema: JSONSchema7 = {
+const sendBulkEmailRequestSchema: JSONSchemaType<any> = {
 	type: 'object',
 	properties: {
 		BulkEmailEntries: {
@@ -307,6 +307,6 @@ const sendBulkEmailRequestSchema: JSONSchema7 = {
 		ReplyToAddresses: {type: 'array', items: {type: 'string'}},
 	},
 	required: ['BulkEmailEntries', 'DefaultContent', 'FromEmailAddress'],
-};
+} as unknown as JSONSchemaType<any>;
 
 const validate = ajv.compile(sendBulkEmailRequestSchema);

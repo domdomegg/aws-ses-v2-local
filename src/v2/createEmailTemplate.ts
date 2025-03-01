@@ -1,6 +1,6 @@
 import type {RequestHandler} from 'express';
-import type {JSONSchema7} from 'json-schema';
 import ajv from '../ajv';
+import {type JSONSchemaType} from 'ajv';
 import {hasTemplate, setTemplate, type Template} from '../store';
 
 const handler: RequestHandler = (req, res) => {
@@ -24,7 +24,7 @@ const handler: RequestHandler = (req, res) => {
 
 export default handler;
 
-const templateSchema: JSONSchema7 = {
+const templateSchema: JSONSchemaType<Record<string, Record<string, string> | string>> = {
 	type: 'object',
 	properties: {
 		TemplateContent: {

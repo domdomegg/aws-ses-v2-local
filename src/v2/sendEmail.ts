@@ -1,8 +1,8 @@
 import type {RequestHandler} from 'express';
-import type {JSONSchema7} from 'json-schema';
 import {type AddressObject, simpleParser} from 'mailparser';
 import ajv from '../ajv';
 import {saveEmail} from '../store';
+import {type JSONSchemaType} from 'ajv';
 
 const handler: RequestHandler = (req, res, next) => {
 	const valid = validate(req.body);
@@ -87,7 +87,7 @@ const handleRaw: RequestHandler = async (req, res) => {
 
 export default handler;
 
-const sendEmailRequestSchema: JSONSchema7 = {
+const sendEmailRequestSchema: JSONSchemaType<any> = {
 	type: 'object',
 	properties: {
 		ConfigurationSetName: {type: 'string'},
@@ -177,6 +177,6 @@ const sendEmailRequestSchema: JSONSchema7 = {
 		ReplyToAddresses: {type: 'array', items: {type: 'string'}},
 	},
 	required: ['Content'],
-};
+} as unknown as JSONSchemaType<any>;
 
 const validate = ajv.compile(sendEmailRequestSchema);

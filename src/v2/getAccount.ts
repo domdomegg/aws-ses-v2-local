@@ -1,6 +1,6 @@
 import type {RequestHandler} from 'express';
-import type {JSONSchema7} from 'json-schema';
 import ajv from '../ajv';
+import {type JSONSchemaType} from 'ajv';
 
 const handler: RequestHandler = (req, res) => {
 	if (!process.env.AWS_SES_ACCOUNT) {
@@ -19,7 +19,7 @@ const handler: RequestHandler = (req, res) => {
 
 export default handler;
 
-const accountSchema: JSONSchema7 = {
+const accountSchema: JSONSchemaType<any> = {
 	type: 'object',
 	properties: {
 		DedicatedIpAutoWarmupEnabled: {type: 'boolean'},
@@ -58,6 +58,6 @@ const accountSchema: JSONSchema7 = {
 			},
 		},
 	},
-};
+} as unknown as JSONSchemaType<any>;
 
 const validate = ajv.compile(accountSchema);

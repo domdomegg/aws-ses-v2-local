@@ -1,6 +1,6 @@
 import type {RequestHandler} from 'express';
-import type {JSONSchema7} from 'json-schema';
 import ajv from '../ajv';
+import {type JSONSchemaType} from 'ajv';
 import {saveEmail} from '../store';
 
 const handler: RequestHandler = async (req, res) => {
@@ -45,7 +45,7 @@ const handler: RequestHandler = async (req, res) => {
 
 export default handler;
 
-const sendEmailRequestSchema: JSONSchema7 = {
+const sendEmailRequestSchema: JSONSchemaType<Record<string, string>> = {
 	type: 'object',
 	properties: {
 		Action: {type: 'string', pattern: '^SendEmail$'},

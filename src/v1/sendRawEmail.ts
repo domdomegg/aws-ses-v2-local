@@ -1,7 +1,7 @@
 import type {RequestHandler} from 'express';
-import type {JSONSchema7} from 'json-schema';
 import {type AddressObject, simpleParser} from 'mailparser';
 import ajv from '../ajv';
+import {type JSONSchemaType} from 'ajv';
 import {saveEmail} from '../store';
 
 const handler: RequestHandler = async (req, res) => {
@@ -43,7 +43,7 @@ const handler: RequestHandler = async (req, res) => {
 
 export default handler;
 
-const sendRawEmailRequestSchema: JSONSchema7 = {
+const sendRawEmailRequestSchema: JSONSchemaType<Record<string, string>> = {
 	type: 'object',
 	properties: {
 		Action: {type: 'string', pattern: '^SendRawEmail$'},
