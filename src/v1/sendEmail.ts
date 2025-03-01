@@ -1,21 +1,41 @@
 import type {RequestHandler} from 'express';
-import ajv from '../ajv';
-import {type JSONSchemaType} from 'ajv';
 import {saveEmail} from '../store';
+import {z} from 'zod';
+
+const sendEmailSchema = z.object({
+	Action: z.literal('SendEmail'),
+	Version: z.string().optional(),
+	ConfigurationSetName: z.string().optional(),
+	'Destination.ToAddresses.member.1': z.string().optional(),
+	'Destination.CcAddresses.member.1': z.string().optional(),
+	'Destination.BccAddresses.member.1': z.string().optional(),
+	'Message.Body.Html.Data': z.string().optional(),
+	'Message.Body.Html.Charset': z.string().optional(),
+	'Message.Body.Text.Data': z.string().optional(),
+	'Message.Body.Text.Charset': z.string().optional(),
+	'Message.Subject.Data': z.string(),
+	'Message.Subject.Charset': z.string().optional(),
+	'ReplyToAddresses.member.1': z.string().optional(),
+	ReturnPath: z.string().optional(),
+	ReturnPathArn: z.string().optional(),
+	Source: z.string(),
+	SourceArn: z.string().optional(),
+	'Tags.member.1': z.string().optional(),
+});
 
 const handler: RequestHandler = async (req, res) => {
-	const valid = validate(req.body);
-	if (!valid) {
-		res.status(404).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+	const result = sendEmailSchema.safeParse(req.body);
+	if (!result.success) {
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
 		return;
 	}
 
-	if (!req.body['Message.Body.Text.Data'] && !req.body['Message.Body.Html.Data']) {
+	if (!result.data['Message.Body.Text.Data'] && !result.data['Message.Body.Html.Data']) {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have either a HTML or Text body.'});
 		return;
 	}
 
-	if (!req.body['Message.Subject.Data']) {
+	if (!result.data['Message.Subject.Data']) {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a subject.'});
 		return;
 	}
@@ -24,17 +44,17 @@ const handler: RequestHandler = async (req, res) => {
 
 	saveEmail({
 		messageId,
-		from: req.body.Source,
-		replyTo: Object.keys(req.body).filter((k) => k.startsWith('ReplyToAddresses.member.')).map((k) => req.body[k]),
+		from: result.data.Source,
+		replyTo: stringKeysBeginningWith(result.data, 'ReplyToAddresses.member.'),
 		destination: {
-			to: Object.keys(req.body).filter((k) => k.startsWith('Destination.ToAddresses.member.')).map((k) => req.body[k]),
-			cc: Object.keys(req.body).filter((k) => k.startsWith('Destination.CcAddresses.member.')).map((k) => req.body[k]),
-			bcc: Object.keys(req.body).filter((k) => k.startsWith('Destination.BccAddresses.member.')).map((k) => req.body[k]),
+			to: stringKeysBeginningWith(result.data, 'Destination.ToAddresses.member.'),
+			cc: stringKeysBeginningWith(result.data, 'Destination.CcAddresses.member.'),
+			bcc: stringKeysBeginningWith(result.data, 'Destination.BccAddresses.member.'),
 		},
-		subject: req.body['Message.Subject.Data'],
+		subject: result.data['Message.Subject.Data'],
 		body: {
-			text: req.body['Message.Body.Text.Data'],
-			html: req.body['Message.Body.Html.Data'],
+			text: result.data['Message.Body.Text.Data'],
+			html: result.data['Message.Body.Html.Data'],
 		},
 		attachments: [],
 		at: Math.floor(new Date().getTime() / 1000),
@@ -43,32 +63,17 @@ const handler: RequestHandler = async (req, res) => {
 	res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><SendEmailResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/"><SendEmailResult><MessageId>${messageId}</MessageId></SendEmailResult></SendEmailResponse>`);
 };
 
-export default handler;
+const stringKeysBeginningWith = (obj: Record<string, unknown>, prefix: string): string[] => {
+	return Object.keys(obj)
+		.filter((k) => k.startsWith(prefix))
+		.map((k) => {
+			const result = obj[k];
+			if (typeof result !== 'string') {
+				throw new Error(`Expected the value for '${k}' to be a string, but got a ${typeof result}`);
+			}
 
-const sendEmailRequestSchema: JSONSchemaType<Record<string, string>> = {
-	type: 'object',
-	properties: {
-		Action: {type: 'string', pattern: '^SendEmail$'},
-		Version: {type: 'string'},
-
-		ConfigurationSetName: {type: 'string'},
-		'Destination.ToAddresses.member.1': {type: 'string'},
-		'Destination.CcAddresses.member.1': {type: 'string'},
-		'Destination.BccAddresses.member.1': {type: 'string'},
-		'Message.Body.Html.Data': {type: 'string'},
-		'Message.Body.Html.Charset': {type: 'string'},
-		'Message.Body.Text.Data': {type: 'string'},
-		'Message.Body.Text.Charset': {type: 'string'},
-		'Message.Subject.Data': {type: 'string'},
-		'Message.Subject.Charset': {type: 'string'},
-		'ReplyToAddresses.member.1': {type: 'string'},
-		ReturnPath: {type: 'string'},
-		ReturnPathArn: {type: 'string'},
-		Source: {type: 'string'},
-		SourceArn: {type: 'string'},
-		'Tags.member.1': {type: 'string'},
-	},
-	required: ['Action', 'Source', 'Message.Subject.Data'],
+			return result;
+		});
 };
 
-const validate = ajv.compile(sendEmailRequestSchema);
+export default handler;

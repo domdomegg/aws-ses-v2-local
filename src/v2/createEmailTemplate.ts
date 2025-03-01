@@ -1,44 +1,23 @@
 import type {RequestHandler} from 'express';
-import ajv from '../ajv';
-import {type JSONSchemaType} from 'ajv';
-import {hasTemplate, setTemplate, type Template} from '../store';
+import {
+	hasTemplate, setTemplate, templateSchema,
+} from '../store';
 
 const handler: RequestHandler = (req, res) => {
-	const valid = validate(req.body);
-	if (!valid) {
-		res.status(404).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+	const result = templateSchema.safeParse(req.body);
+	if (!result.success) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
 		return;
 	}
 
-	const template: Template = req.body;
-
 	// Check if the template already exists.
-	if (hasTemplate(template.TemplateName)) {
+	if (hasTemplate(result.data.TemplateName)) {
 		res.status(400).send({type: 'AlreadyExistsException', message: 'The resource specified in your request already exists.'});
 		return;
 	}
 
-	setTemplate(template.TemplateName, template);
+	setTemplate(result.data.TemplateName, result.data);
 	res.status(200).send();
 };
 
 export default handler;
-
-const templateSchema: JSONSchemaType<Record<string, Record<string, string> | string>> = {
-	type: 'object',
-	properties: {
-		TemplateContent: {
-			type: 'object',
-			properties: {
-				Html: {type: 'string'},
-				Subject: {type: 'string'},
-				Text: {type: 'string'},
-			},
-			required: ['Subject'],
-		},
-		TemplateName: {type: 'string'},
-	},
-	required: ['TemplateContent', 'TemplateName'],
-};
-
-const validate = ajv.compile(templateSchema);

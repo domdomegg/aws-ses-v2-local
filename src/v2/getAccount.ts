@@ -1,6 +1,31 @@
 import type {RequestHandler} from 'express';
-import ajv from '../ajv';
-import {type JSONSchemaType} from 'ajv';
+import {z} from 'zod';
+
+const accountSchema = z.object({
+	DedicatedIpAutoWarmupEnabled: z.boolean(),
+	Details: z.object({
+		AdditionalContactEmailAddresses: z.array(z.string()),
+		ContactLanguage: z.string(),
+		MailType: z.string(),
+		ReviewDetails: z.object({
+			CaseId: z.string(),
+			Status: z.string(),
+		}),
+		UseCaseDescription: z.string(),
+		WebsiteURL: z.string(),
+	}),
+	EnforcementStatus: z.string(),
+	ProductionAccessEnabled: z.boolean(),
+	SendingEnabled: z.boolean(),
+	SendQuota: z.object({
+		Max24HourSend: z.number(),
+		MaxSendRate: z.number(),
+		SentLast24Hours: z.number(),
+	}),
+	SuppressionAttributes: z.object({
+		SuppressedReasons: z.array(z.string()),
+	}),
+});
 
 const handler: RequestHandler = (req, res) => {
 	if (!process.env.AWS_SES_ACCOUNT) {
@@ -9,8 +34,9 @@ const handler: RequestHandler = (req, res) => {
 	}
 
 	const account = JSON.parse(process.env.AWS_SES_ACCOUNT);
-	if (!validate(account)) {
-		res.status(404).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+	const result = accountSchema.safeParse(account);
+	if (!result.success) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
 		return;
 	}
 
@@ -18,46 +44,3 @@ const handler: RequestHandler = (req, res) => {
 };
 
 export default handler;
-
-const accountSchema: JSONSchemaType<any> = {
-	type: 'object',
-	properties: {
-		DedicatedIpAutoWarmupEnabled: {type: 'boolean'},
-		Details: {
-			type: 'object',
-			properties: {
-				AdditionalContactEmailAddresses: {type: 'array', items: {type: 'string'}},
-				ContactLanguage: {type: 'string'},
-				MailType: {type: 'string'},
-				ReviewDetails: {
-					type: 'object',
-					properties: {
-						CaseId: {type: 'string'},
-						Status: {type: 'string'},
-					},
-				},
-				UseCaseDescription: {type: 'string'},
-				WebsiteURL: {type: 'string'},
-			},
-		},
-		EnforcementStatus: {type: 'string'},
-		ProductionAccessEnabled: {type: 'boolean'},
-		SendingEnabled: {type: 'boolean'},
-		SendQuota: {
-			type: 'object',
-			properties: {
-				Max24HourSend: {type: 'number'},
-				MaxSendRate: {type: 'number'},
-				SentLast24Hours: {type: 'number'},
-			},
-		},
-		SuppressionAttributes: {
-			type: 'object',
-			properties: {
-				SuppressedReasons: {type: 'array', items: {type: 'string'}},
-			},
-		},
-	},
-} as unknown as JSONSchemaType<any>;
-
-const validate = ajv.compile(accountSchema);

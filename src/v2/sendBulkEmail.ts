@@ -1,10 +1,9 @@
 import type {RequestHandler} from 'express';
-import ajv from '../ajv';
-import {type JSONSchemaType} from 'ajv';
 import {
 	type Email, getTemplate, hasTemplate, saveEmail,
 } from '../store';
 import isEmailValid from '../isEmailValid';
+import {z} from 'zod';
 
 type Replacement = {
 	Name: string;
@@ -17,66 +16,63 @@ type BulkEmailResult = {
 	Status: string;
 };
 
-type BulkEmailDefaultContent = {
-	Template: {
-		TemplateArn?: string;
-		TemplateData?: string;
-		TemplateName?: string;
+const replacementSchema = z.object({
+	Name: z.string(),
+	Value: z.string(),
+});
 
-		TemplateContent?: {
-			Subject?: string;
-			Html?: string;
-			Text?: string;
-		};
-	};
-};
+const sendBulkEmailSchema = z.object({
+	BulkEmailEntries: z.array(z.object({
+		Destination: z.object({
+			BccAddresses: z.array(z.string()).optional(),
+			CcAddresses: z.array(z.string()).optional(),
+			ToAddresses: z.array(z.string()),
+		}),
+		ReplacementEmailContent: z.object({
+			ReplacementTemplate: z.object({
+				ReplacementTemplateData: z.string(),
+			}),
+		}).optional(),
+		ReplacementTags: z.array(replacementSchema).optional(),
+	})),
+	ConfigurationSetName: z.string().optional(),
+	DefaultContent: z.object({
+		Template: z.object({
+			TemplateArn: z.string().optional(),
+			TemplateData: z.string().optional(),
+			TemplateName: z.string().optional(),
+			TemplateContent: z.object({
+				Subject: z.string(),
+				Html: z.string().optional(),
+				Text: z.string().optional(),
+			}).optional(),
+		}),
+	}),
+	DefaultEmailTags: z.array(replacementSchema).optional(),
+	FeedbackForwardingEmailAddress: z.string().optional(),
+	FeedbackForwardingEmailAddressIdentityArn: z.string().optional(),
+	FromEmailAddress: z.string(),
+	FromEmailAddressIdentityArn: z.string().optional(),
+	ReplyToAddresses: z.array(z.string()).optional(),
+});
 
-type BulkEmailEntry = {
-	Destination: {
-		BccAddresses?: string[];
-		CcAddresses?: string[];
-		ToAddresses: string[];
-	};
-	ReplacementEmailContent?: {
-		ReplacementTemplate?: {
-			ReplacementTemplateData?: string;
-		};
-	};
-	ReplacementTags?: Replacement[];
-};
-
-type BulkEmailBody = {
-	BulkEmailEntries: BulkEmailEntry[];
-	ConfigurationSetName: string;
-	DefaultContent: BulkEmailDefaultContent;
-	DefaultEmailTags?: Replacement[];
-	FeedbackForwardingEmailAddress: string;
-	FeedbackForwardingEmailAddressIdentityArn: string;
-	FromEmailAddress: string;
-	FromEmailAddressIdentityArn: string;
-	ReplyToAddresses: string[];
-};
-
+// Not certain whether the `next` argument is necessary for express
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const handler: RequestHandler = (req, res, next) => {
-	if (!validate(req.body)) {
-		res.status(404).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+	const result = sendBulkEmailSchema.safeParse(req.body);
+	if (!result.success) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
 		return;
 	}
 
-	handleBulk(req, res, next);
-};
-
-const handleBulk: RequestHandler = async (req, res) => {
-	const body = req.body as unknown as BulkEmailBody;
-
-	if (!body.FromEmailAddress) {
+	if (!result.data.FromEmailAddress) {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a from email address.'});
 		return;
 	}
 
-	const fromEmailAddress = body.FromEmailAddress;
-	const replyToAddresses = body.ReplyToAddresses ?? [];
-	const defaultContent = body.DefaultContent;
+	const fromEmailAddress = result.data.FromEmailAddress;
+	const replyToAddresses = result.data.ReplyToAddresses ?? [];
+	const defaultContent = result.data.DefaultContent;
 
 	// Try to retrieve the template.
 	const templateName = defaultContent.Template.TemplateName;
@@ -117,7 +113,7 @@ const handleBulk: RequestHandler = async (req, res) => {
 
 	const results: BulkEmailResult[] = [];
 	// Process each destination.
-	body.BulkEmailEntries.forEach((entry, index) => {
+	result.data.BulkEmailEntries.forEach((entry, index) => {
 		const messageId = `ses-${Math.floor((Math.random() * 900000000) + 100000000 + index)}`;
 
 		// Validate destination email address.
@@ -219,94 +215,3 @@ function replaceTemplateData(content: string, replacements: Replacement[] = [], 
 }
 
 export default handler;
-
-const sendBulkEmailRequestSchema: JSONSchemaType<any> = {
-	type: 'object',
-	properties: {
-		BulkEmailEntries: {
-			type: 'array',
-			items: {
-				type: 'object',
-				properties: {
-					Destination: {
-						type: 'object',
-						properties: {
-							BccAddresses: {type: 'array', items: {type: 'string'}},
-							CcAddresses: {type: 'array', items: {type: 'string'}},
-							ToAddresses: {type: 'array', items: {type: 'string'}},
-						},
-						required: ['ToAddresses'],
-					},
-					ReplacementEmailContent: {
-						type: 'object',
-						properties: {
-							ReplacementTemplate: {
-								type: 'object',
-								properties: {
-									ReplacementTemplateData: {type: 'string'},
-								},
-								required: ['ReplacementTemplateData'],
-							},
-						},
-						required: ['ReplacementTemplate'],
-					},
-					ReplacementTags: {
-						type: 'array',
-						items: {
-							type: 'object',
-							properties: {
-								Name: {type: 'string'},
-								Value: {type: 'string'},
-							},
-							required: ['Name', 'Value'],
-						},
-					},
-				},
-				required: ['Destination'],
-			},
-		},
-		ConfigurationSetName: {type: 'string'},
-		DefaultContent: {
-			type: 'object',
-			properties: {
-				Template: {
-					type: 'object',
-					properties: {
-						TemplateArn: {type: 'string'},
-						TemplateData: {type: 'string'},
-						TemplateName: {type: 'string'},
-						TemplateContent: {
-							type: 'object',
-							properties: {
-								Subject: {type: 'string'},
-								Html: {type: 'string'},
-								Text: {type: 'string'},
-							},
-							required: ['Subject'],
-						},
-					},
-				},
-			},
-			required: ['Template'],
-		},
-		DefaultEmailTags: {
-			type: 'array',
-			items: {
-				type: 'object',
-				properties: {
-					Name: {type: 'string'},
-					Value: {type: 'string'},
-				},
-				required: ['Name', 'Value'],
-			},
-		},
-		FeedbackForwardingEmailAddress: {type: 'string'},
-		FeedbackForwardingEmailAddressIdentityArn: {type: 'string'},
-		FromEmailAddress: {type: 'string'},
-		FromEmailAddressIdentityArn: {type: 'string'},
-		ReplyToAddresses: {type: 'array', items: {type: 'string'}},
-	},
-	required: ['BulkEmailEntries', 'DefaultContent', 'FromEmailAddress'],
-} as unknown as JSONSchemaType<any>;
-
-const validate = ajv.compile(sendBulkEmailRequestSchema);

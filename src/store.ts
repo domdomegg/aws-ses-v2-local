@@ -1,5 +1,6 @@
 import {type MailOptions} from 'nodemailer/lib/sendmail-transport';
 import {sendEmailToSmtp} from './smtp';
+import z from 'zod';
 
 export type Store = {
 	emails: Email[];
@@ -24,14 +25,16 @@ export type Email = {
 	at: number;
 };
 
-export type Template = {
-	TemplateContent: {
-		Html: string;
-		Subject: string;
-		Text: string;
-	};
-	TemplateName: string;
-};
+export const templateSchema = z.object({
+	TemplateContent: z.object({
+		Html: z.string().optional(),
+		Subject: z.string().optional(),
+		Text: z.string().optional(),
+	}),
+	TemplateName: z.string(),
+});
+
+export type Template = z.infer<typeof templateSchema>;
 
 const store: Store = {
 	emails: [],

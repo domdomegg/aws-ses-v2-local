@@ -41,12 +41,12 @@
   },
   "dependencies": {
     "@tsconfig/node-lts": "^22.0.1",
-    "ajv": "^8.11.0",
     "eslint-config-domdomegg": "^2.0.8",
     "express": "^4.18.2",
     "mailparser": "^3.5.0",
     "nodemailer": "^6.8.0",
     "tsconfig-domdomegg": "^1.0.0",
-    "yargs": "^17.6.0"
+    "yargs": "^17.6.0",
+    "zod": "^3.24.2"
   }
 }

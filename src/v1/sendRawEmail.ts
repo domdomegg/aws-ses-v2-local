@@ -1,20 +1,32 @@
 import type {RequestHandler} from 'express';
 import {type AddressObject, simpleParser} from 'mailparser';
-import ajv from '../ajv';
-import {type JSONSchemaType} from 'ajv';
 import {saveEmail} from '../store';
+import {z} from 'zod';
+
+const sendRawEmailSchema = z.object({
+	Action: z.literal('SendRawEmail'),
+	Version: z.string().optional(),
+	ConfigurationSetName: z.string().optional(),
+	'Destinations.member.1': z.string().optional(),
+	FromArn: z.string().optional(),
+	'RawMessage.Data': z.string(),
+	ReturnPathArn: z.string().optional(),
+	Source: z.string().optional(),
+	SourceArn: z.string().optional(),
+	'Tags.member.1': z.string().optional(),
+});
 
 const handler: RequestHandler = async (req, res) => {
-	const valid = validate(req.body);
-	if (!valid) {
-		res.status(404).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+	const result = sendRawEmailSchema.safeParse(req.body);
+	if (!result.success) {
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
 		return;
 	}
 
 	const messageId = `ses-${Math.floor((Math.random() * 900000000) + 100000000)}`;
 
-	const message = await simpleParser(Buffer.from(req.body['RawMessage.Data'], 'base64'));
-	const from = message.from?.text ?? req.body.Source;
+	const message = await simpleParser(Buffer.from(result.data['RawMessage.Data'], 'base64'));
+	const from = message.from?.text ?? result.data.Source;
 	if (!from) {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Missing source or from value'});
 		return;
@@ -42,23 +54,3 @@ const handler: RequestHandler = async (req, res) => {
 };
 
 export default handler;
-
-const sendRawEmailRequestSchema: JSONSchemaType<Record<string, string>> = {
-	type: 'object',
-	properties: {
-		Action: {type: 'string', pattern: '^SendRawEmail$'},
-		Version: {type: 'string'},
-
-		ConfigurationSetName: {type: 'string'},
-		'Destinations.member.1': {type: 'string'},
-		FromArn: {type: 'string'},
-		'RawMessage.Data': {type: 'string'},
-		ReturnPathArn: {type: 'string'},
-		Source: {type: 'string'},
-		SourceArn: {type: 'string'},
-		'Tags.member.1': {type: 'string'},
-	},
-	required: ['Action', 'RawMessage.Data'],
-};
-
-const validate = ajv.compile(sendRawEmailRequestSchema);
