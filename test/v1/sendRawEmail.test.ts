@@ -1,3 +1,4 @@
+import {test, expect} from 'vitest';
 import {SES, SendRawEmailCommand} from '@aws-sdk/client-ses';
 import axios from 'axios';
 import {type Store} from '../../src/store';

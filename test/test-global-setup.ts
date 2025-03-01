@@ -9,4 +9,15 @@ export default async () => {
 
 	const baseURL = getAddress(s);
 	process.env.__AWS_SES_V2_LOCAL_BASEURL = baseURL;
+
+	return async () => new Promise<void>((resolve, reject) => {
+		s.close((err) => {
+			if (err) {
+				reject(err);
+				return;
+			}
+
+			resolve();
+		});
+	});
 };

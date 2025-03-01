@@ -1,15 +1,8 @@
+import {test, expect} from 'vitest';
 import {SESv2Client, SendEmailCommand} from '@aws-sdk/client-sesv2';
 import axios from 'axios';
 import {type Store} from '../../src/store';
 import {baseURL} from '../globals';
-
-beforeEach(async () => {
-	await axios({
-		method: 'post',
-		url: '/clear-store',
-		baseURL,
-	});
-});
 
 test('can send email with v2 API', async () => {
 	const ses = new SESv2Client({

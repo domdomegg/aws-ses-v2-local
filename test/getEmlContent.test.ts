@@ -1,3 +1,4 @@
+import {test, expect} from 'vitest';
 import {SES, SendEmailCommand} from '@aws-sdk/client-ses';
 import axios from 'axios';
 import {type Store} from '../src/store';
@@ -24,7 +25,7 @@ test('can get eml content', async () => {
 		url: '/store',
 	})).data;
 	expect(storeWithEmails.emails).toHaveLength(1);
-	const {messageId} = storeWithEmails.emails[0];
+	const {messageId} = storeWithEmails.emails[0]!;
 
 	const c: CreateEmlContentResult = (await axios({
 		method: 'get',

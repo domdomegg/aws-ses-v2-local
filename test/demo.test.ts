@@ -1,3 +1,4 @@
+import {test} from 'vitest';
 import {SESv2Client, SendEmailCommand} from '@aws-sdk/client-sesv2';
 
 const baseURL = 'http://localhost:8005';
