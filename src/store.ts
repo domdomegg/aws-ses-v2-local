@@ -1,46 +1,46 @@
-import { MailOptions } from 'nodemailer/lib/sendmail-transport';
-import { sendEmailToSmtp } from './smtp';
+import {type MailOptions} from 'nodemailer/lib/sendmail-transport';
+import {sendEmailToSmtp} from './smtp';
 
-export interface Store {
-  emails: Email[],
-  templates: Map<string, Template>,
-}
+export type Store = {
+	emails: Email[];
+	templates: Map<string, Template>;
+};
 
-export interface Email {
-  messageId: string,
-  from: string,
-  replyTo: string[],
-  destination: {
-    to: string[],
-    cc: string[],
-    bcc: string[],
-  },
-  subject: string,
-  body: {
-    html?: string,
-    text?: string,
-  },
-  attachments: { content: string, contentType: string, filename?: string, size: number }[]
-  at: number,
-}
+export type Email = {
+	messageId: string;
+	from: string;
+	replyTo: string[];
+	destination: {
+		to: string[];
+		cc: string[];
+		bcc: string[];
+	};
+	subject: string;
+	body: {
+		html?: string;
+		text?: string;
+	};
+	attachments: {content: string; contentType: string; filename?: string; size: number}[];
+	at: number;
+};
 
-export interface Template {
-  TemplateContent: {
-    Html: string,
-    Subject: string,
-    Text: string,
-  },
-  TemplateName: string,
-}
+export type Template = {
+	TemplateContent: {
+		Html: string;
+		Subject: string;
+		Text: string;
+	};
+	TemplateName: string;
+};
 
 const store: Store = {
-  emails: [],
-  templates: new Map(),
+	emails: [],
+	templates: new Map(),
 };
 
 export const saveEmail = (email: Email) => {
-  store.emails.push(email);
-  sendEmailToSmtp(email);
+	store.emails.push(email);
+	void sendEmailToSmtp(email);
 };
 
 export const hasTemplate = (key: string) => store.templates.has(key);
@@ -49,8 +49,8 @@ export const setTemplate = (key: string, value: Template) => store.templates.set
 export const deleteTemplate = (key: string) => store.templates.delete(key);
 
 export const clearStore = () => {
-  store.emails = [];
-  store.templates.clear();
+	store.emails = [];
+	store.templates.clear();
 };
 
 // This type doesn't give us perfect readonly safety
@@ -59,14 +59,14 @@ export const clearStore = () => {
 export const getStoreReadonly = (): Readonly<Store> => store;
 
 export const convertToMailOptions = (email: Email): MailOptions => ({
-  from: email.from,
-  replyTo: email.replyTo,
-  to: email.destination.to,
-  cc: email.destination.cc,
-  bcc: email.destination.bcc,
-  subject: email.subject,
-  html: email.body.html,
-  text: email.body.text,
-  attachments: email.attachments,
-  date: new Date(email.at * 1000),
+	from: email.from,
+	replyTo: email.replyTo,
+	to: email.destination.to,
+	cc: email.destination.cc,
+	bcc: email.destination.bcc,
+	subject: email.subject,
+	html: email.body.html,
+	text: email.body.text,
+	attachments: email.attachments,
+	date: new Date(email.at * 1000),
 });

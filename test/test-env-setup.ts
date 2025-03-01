@@ -1,10 +1,10 @@
 import axios from 'axios';
-import { baseURL } from './globals';
+import {baseURL} from './globals';
 
 beforeEach(async () => {
-  await axios({
-    method: 'post',
-    url: '/clear-store',
-    baseURL,
-  });
+	await axios({
+		method: 'post',
+		url: '/clear-store',
+		baseURL,
+	});
 });

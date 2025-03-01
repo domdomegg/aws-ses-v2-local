@@ -1,20 +1,7 @@
 {
-  "compilerOptions": {
-    "module": "commonjs",
-    "target": "es2021",
-
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-
-    "outDir": "dist",
-    "rootDirs": [
-      "src",
-      "test"
-    ],
-    "declaration": true,
-  },
+  "extends": ["@tsconfig/node-lts/tsconfig.json", "tsconfig-domdomegg/tsconfig.json"],
   "include": [
-    "src/**/*.ts"
-  ]
+    "src/**/*",
+    "test/**/*",
+  ],
 }

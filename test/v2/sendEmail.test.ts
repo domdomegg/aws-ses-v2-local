@@ -1,73 +1,73 @@
-import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import {SESv2Client, SendEmailCommand} from '@aws-sdk/client-sesv2';
 import axios from 'axios';
-import { Store } from '../../src/store';
-import { baseURL } from '../globals';
+import {type Store} from '../../src/store';
+import {baseURL} from '../globals';
 
 beforeEach(async () => {
-  await axios({
-    method: 'post',
-    url: '/clear-store',
-    baseURL,
-  });
+	await axios({
+		method: 'post',
+		url: '/clear-store',
+		baseURL,
+	});
 });
 
 test('can send email with v2 API', async () => {
-  const ses = new SESv2Client({
-    endpoint: baseURL,
-    region: 'aws-ses-v2-local',
-    credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
-  });
-  await ses.send(new SendEmailCommand({
-    FromEmailAddress: 'sender@example.com',
-    Destination: { ToAddresses: ['receiver@example.com'] },
-    Content: {
-      Simple: {
-        Subject: { Data: 'This is the subject' },
-        Body: { Text: { Data: 'This is the email contents' } },
-      },
-    },
-  }));
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com']},
+		Content: {
+			Simple: {
+				Subject: {Data: 'This is the subject'},
+				Body: {Text: {Data: 'This is the email contents'}},
+			},
+		},
+	}));
 
-  const s: Store = (await axios({
-    method: 'get',
-    baseURL,
-    url: '/store',
-  })).data;
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
 
-  expect(s.emails).toMatchObject([
-    {
-      at: expect.any(Number),
-      attachments: [],
-      body: {
-        text: 'This is the email contents',
-      },
-      destination: {
-        bcc: [],
-        cc: [],
-        to: [
-          'receiver@example.com',
-        ],
-      },
-      from: 'sender@example.com',
-      messageId: expect.any(String),
-      replyTo: [],
-      subject: 'This is the subject',
-    },
-  ]);
+	expect(s.emails).toMatchObject([
+		{
+			at: expect.any(Number),
+			attachments: [],
+			body: {
+				text: 'This is the email contents',
+			},
+			destination: {
+				bcc: [],
+				cc: [],
+				to: [
+					'receiver@example.com',
+				],
+			},
+			from: 'sender@example.com',
+			messageId: expect.any(String),
+			replyTo: [],
+			subject: 'This is the subject',
+		},
+	]);
 });
 
 test('can send raw email with v2 API and html body', async () => {
-  const ses = new SESv2Client({
-    endpoint: baseURL,
-    region: 'aws-ses-v2-local',
-    credentials: { accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING' },
-  });
-  await ses.send(new SendEmailCommand({
-    FromEmailAddress: 'sender@example.com',
-    Destination: { ToAddresses: ['receiver@example.com'] },
-    Content: {
-      Raw: {
-        Data: new TextEncoder().encode(`From you@yourapp.com Thu Nov  3 11:21:04 2022
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com']},
+		Content: {
+			Raw: {
+				Data: new TextEncoder().encode(`From you@yourapp.com Thu Nov  3 11:21:04 2022
 Received: from server.outlook.com
  (2603:10a6:20b:2c9::7) by server.outlook.com with
  HTTPS; Thu, 3 Nov 2022 11:21:04 +0000
@@ -118,22 +118,22 @@ Content-Transfer-Encoding: 8bit
 
 --_000_e59630d301e21fc5ff7b192a89acb6cf50deffebcamelexamplec_--
 `),
-      },
-    },
-  }));
+			},
+		},
+	}));
 
-  const s: Store = (await axios({
-    method: 'get',
-    baseURL,
-    url: '/store',
-  })).data;
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
 
-  expect(s.emails).toMatchObject([
-    {
-      at: expect.any(Number),
-      attachments: [],
-      body: {
-        html: `<html lang="en">
+	expect(s.emails).toMatchObject([
+		{
+			at: expect.any(Number),
+			attachments: [],
+			body: {
+				html: `<html lang="en">
 <head title="">
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 </head>
@@ -143,19 +143,19 @@ Content-Transfer-Encoding: 8bit
 </body>
 </html>
 `,
-        text: 'html email test\n',
-      },
-      destination: {
-        bcc: [],
-        cc: [],
-        to: [
-          'someone <someone@example.com>',
-        ],
-      },
-      from: 'You <you@yourapp.com>',
-      messageId: expect.any(String),
-      replyTo: [],
-      subject: 'Test email sent to aws-ses-v2-local!',
-    },
-  ]);
+				text: 'html email test\n',
+			},
+			destination: {
+				bcc: [],
+				cc: [],
+				to: [
+					'someone <someone@example.com>',
+				],
+			},
+			from: 'You <you@yourapp.com>',
+			messageId: expect.any(String),
+			replyTo: [],
+			subject: 'Test email sent to aws-ses-v2-local!',
+		},
+	]);
 });
