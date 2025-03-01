@@ -93,10 +93,10 @@ Content-Transfer-Encoding: 8bit
 				bcc: [],
 				cc: [],
 				to: [
-					'someone <someone@example.com>',
+					'"someone" <someone@example.com>',
 				],
 			},
-			from: 'You <you@yourapp.com>',
+			from: '"You" <you@yourapp.com>',
 			messageId: expect.any(String),
 			replyTo: [],
 			subject: 'Test email sent to aws-ses-v2-local!',
