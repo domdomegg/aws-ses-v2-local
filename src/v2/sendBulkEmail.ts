@@ -19,7 +19,13 @@ interface BulkEmailDefaultContent {
   Template: {
     TemplateArn?: string;
     TemplateData?: string;
-    TemplateName: string;
+    TemplateName?: string;
+
+    TemplateContent?:{
+      Subject?: string;
+      Html?: string;
+      Text?: string;
+    }
   };
 }
 
@@ -71,15 +77,32 @@ const handleBulk: RequestHandler = async (req, res) => {
 
   // Try to retrieve the template.
   const templateName = defaultContent.Template.TemplateName;
-  if (!hasTemplate(templateName)) {
-    res.status(400).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Unable to find the template: ${templateName}.` });
+  let templateSubject = '';
+  let templateHtml = '';
+  let templateText = '';
+
+  if (templateName) {
+    if (!hasTemplate(templateName)) {
+      res.status(400).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Unable to find the template: ${templateName}.` });
+      return;
+    }
+    const template = getTemplate(templateName);
+    templateSubject = template?.TemplateContent.Subject ?? '';
+    templateHtml = template?.TemplateContent.Html ?? '';
+    templateText = template?.TemplateContent.Text ?? '';
+  } else if (defaultContent.Template.TemplateContent) {
+    templateSubject = defaultContent.Template.TemplateContent?.Subject ?? '';
+    templateHtml = defaultContent.Template.TemplateContent.Html ?? '';
+    templateText = defaultContent.Template.TemplateContent.Text ?? '';
+  } else {
+    res.status(400).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide either a template name or template content.' });
     return;
   }
 
-  const template = getTemplate(templateName);
-  const templateSubject = template?.TemplateContent.Subject ?? '';
-  const templateHtml = template?.TemplateContent.Html ?? '';
-  const templateText = template?.TemplateContent.Text ?? '';
+  if (!templateSubject || (!templateHtml && !templateText)) {
+    res.status(400).send({ type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a subject and either an HTML or text body in the template.' });
+    return;
+  }
 
   // Default template replacement data.
   const defaultTemplateData = decodeTemplateData(defaultContent.Template?.TemplateData);
@@ -247,8 +270,16 @@ const sendBulkEmailRequestSchema: JSONSchema7 = {
             TemplateArn: { type: 'string' },
             TemplateData: { type: 'string' },
             TemplateName: { type: 'string' },
+            TemplateContent: {
+              type: 'object',
+              properties: {
+                Subject: { type: 'string' },
+                Html: { type: 'string' },
+                Text: { type: 'string' },
+              },
+              required: ['Subject'],
+            },
           },
-          required: ['TemplateName'],
         },
       },
       required: ['Template'],
