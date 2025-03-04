@@ -3,9 +3,11 @@
   "compilerOptions": {
     "outDir": "dist",
     "declaration": true,
+    "rootDir": "src",
   },
   "exclude": [
     "test/**/*",
     "**/*.test.ts",
-  ],
+    "vitest.config.mts"
+  ]
 }
