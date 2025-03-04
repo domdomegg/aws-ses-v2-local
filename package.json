@@ -20,7 +20,8 @@
   ],
   "scripts": {
     "start": "npm run build && node dist/cli.js",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:binary_exists",
+    "test:binary_exists": "npm run prepublishOnly && node -e \"require('fs').access(require('./package.json').bin['aws-ses-v2-local'], (err) => process.exit(err ? 1 : 0))\"",
     "test:watch": "vitest",
     "lint": "eslint",
     "clean": "rm -rf dist",
