@@ -1,18 +1,20 @@
 name: Publish Docker image
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - '*'
 
 jobs:
   push_to_registries:
-    name: Push Docker image to multiple registries
+    name: Push Docker image to GHCR registry
     runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
       attestations: write
       id-token: write
+
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -23,7 +25,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
@@ -46,4 +48,3 @@ jobs:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
-
