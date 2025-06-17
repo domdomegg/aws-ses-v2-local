@@ -1,6 +1,6 @@
 {
   "name": "aws-ses-v2-local",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "A local version of Amazon Simple Email Service (AWS SES) supporting the V2 API",
   "license": "MIT",
   "author": "Adam Jones (domdomegg)",
