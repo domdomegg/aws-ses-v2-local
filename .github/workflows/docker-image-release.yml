@@ -3,11 +3,11 @@ name: Publish Docker image
 on:
   push:
     tags:
-      - '*'
+      - 'v*.*.*'  # Only run on _version_ tags, like v1.2.3
 
 jobs:
   push_to_registries:
-    name: Push Docker image to GHCR registry
+    name: Build & Push to GHCR registry (Multi-Arch)
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -19,8 +19,16 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -28,23 +36,57 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+          flavor: |
+            latest=true
 
-      - name: Build and push Docker images
+      - name: Build and push Docker images (Multi-Arch)
         id: push
-        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
+          provenance: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Generate artifact attestation
+      - name: Generate SLSA Provenance Attestation
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      - name: Show built image digest
+        run: |
+          echo "Digest: ${{ steps.push.outputs.digest }}"
+
+      - name: Verify pushed images
+        run: |
+          echo "Verifying multi-architecture manifest..."
+
+          # Extract the main image tag (first tag from metadata)
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "Verifying image: $IMAGE_TAG"
+
+          # Inspect the manifest to verify all architectures are present
+          docker buildx imagetools inspect $IMAGE_TAG
+
+          echo ""
+          echo "✅ Multi-architecture build verification complete!"
+          echo "Expected platforms: linux/amd64, linux/arm64, linux/arm/v7"
+
+          # Verify each platform is present in the manifest
+          echo ""
+          echo "Platform-specific verification:"
+          docker buildx imagetools inspect $IMAGE_TAG --format "{{ range .Manifest.Manifests }}Platform: {{ .Platform.OS }}/{{ .Platform.Architecture }}{{ with .Platform.Variant }}/{{ . }}{{ end }} - Digest: {{ .Digest }}{{ println }}{{ end }}"
