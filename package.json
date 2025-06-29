@@ -24,6 +24,7 @@
     "test:binary_exists": "npm run prepublishOnly && node -e \"require('fs').access(require('./package.json').bin['aws-ses-v2-local'], (err) => process.exit(err ? 1 : 0))\"",
     "test:watch": "vitest",
     "lint": "eslint",
+    "format": "eslint --fix",
     "clean": "rm -rf dist",
     "build": "tsc --project tsconfig.build.json",
     "prepublishOnly": "npm run clean && npm run build",
