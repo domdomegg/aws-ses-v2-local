@@ -4,6 +4,7 @@ import path from 'path';
 import v1SendRawEmail from './v1/sendRawEmail';
 import v1SendEmail from './v1/sendEmail';
 import v2CreateEmailTemplate from './v2/createEmailTemplate';
+import v2GetEmailTemplate from './v2/getEmailTemplate';
 import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
 import v2GetAccount from './v2/getAccount';
 import v2SendEmail from './v2/sendEmail';
@@ -112,6 +113,7 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 
 	// SES V2 - template handling.
 	app.post('/v2/email/templates', v2CreateEmailTemplate);
+	app.get('/v2/email/templates/:TemplateName', v2GetEmailTemplate);
 	app.delete('/v2/email/templates/:TemplateName', v2DeleteEmailTemplate);
 
 	// SES V2 - account handling.
