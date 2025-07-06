@@ -1,6 +1,4 @@
 
-/* eslint-disable no-var */
-
 import type {Server} from 'http';
 
 declare global {
