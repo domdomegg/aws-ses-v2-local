@@ -1,3 +1,4 @@
+import type {Server} from 'http';
 import {
 	test, expect, vi, afterEach,
 } from 'vitest';
@@ -6,13 +7,13 @@ import axios from 'axios';
 import server from '../../src';
 import {getAddress} from '../../src/address';
 
-let testServer: any;
+let testServer: Server | null = null;
 let testBaseURL: string;
 
 afterEach(async () => {
 	if (testServer) {
 		await new Promise<void>((resolve, reject) => {
-			testServer.close((err: Error) => {
+			testServer!.close((err) => {
 				if (err) {
 					reject(err);
 				} else {
