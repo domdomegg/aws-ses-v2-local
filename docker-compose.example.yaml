@@ -1,11 +1,10 @@
 services:
   aws-ses:
-    image: ghcr.io/domdomegg/aws-ses-v2-local
-    build:
-      context: .
     container_name: aws-ses-v2-local
     hostname: aws-ses-v2-local
-    entrypoint: ['node', 'cli.js', '--host', '0.0.0.0', '--port', '8005']
+    build:
+      context: .
+    image: ghcr.io/domdomegg/aws-ses-v2-local:2
     # See .env.example
     environment:
       AWS_SES_ACCOUNT:
