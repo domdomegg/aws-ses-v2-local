@@ -168,4 +168,4 @@ Navigate to the address and port where the server is running in your browser (e.
 
 ### Docker
 
-A Dockerfile that bakes the `/dist/cli.js` is provided. There is also a `docker-compose.example.yml` template to create a container running the aws-ses-v2-local mock server.
+A Dockerfile that bakes the `/dist/cli.js` is provided. There is also a `docker-compose.yml` template to create a container running the aws-ses-v2-local mock server.

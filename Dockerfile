@@ -28,4 +28,4 @@ COPY --from=builder /srv/www/node_modules /srv/www/node_modules/
 COPY --from=builder /srv/www/static /srv/www/static/
 COPY --from=builder /srv/www/package.json /srv/www/package.json
 
-CMD [ "cli.js", "--host", "0.0.0.0", "--port", "8005" ]
+CMD [ "cli.js" ]
