@@ -28,6 +28,4 @@ COPY --from=builder /srv/www/node_modules /srv/www/node_modules/
 COPY --from=builder /srv/www/static /srv/www/static/
 COPY --from=builder /srv/www/package.json /srv/www/package.json
 
-# Use default non-root user provided by distroless images
-# Note: Distroless images are designed to be secure and typically do not run as root.
-CMD ["cli.js"]
+CMD [ "cli.js" ]

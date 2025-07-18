@@ -18,7 +18,7 @@ export type Config = {
 };
 
 export const defaultConfig: Config = {
-	host: 'localhost',
+	host: '::',
 	port: 8005,
 };
 
