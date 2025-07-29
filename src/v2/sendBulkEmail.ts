@@ -4,7 +4,7 @@ import {
 } from '../store';
 import isEmailValid from '../isEmailValid';
 import {z} from 'zod';
-import { getCurrentTimestamp } from '../util';
+import {getCurrentTimestamp} from '../util';
 
 type Replacement = {
 	Name: string;

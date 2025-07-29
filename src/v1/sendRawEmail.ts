@@ -2,7 +2,7 @@ import type {RequestHandler} from 'express';
 import {type AddressObject, simpleParser} from 'mailparser';
 import {saveEmail} from '../store';
 import {z} from 'zod';
-import { getCurrentTimestamp, getMessageId } from '../util';
+import {getCurrentTimestamp, getMessageId} from '../util';
 
 const sendRawEmailSchema = z.object({
 	Action: z.literal('SendRawEmail'),

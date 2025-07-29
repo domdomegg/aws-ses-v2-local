@@ -3,7 +3,7 @@ import {type AddressObject, simpleParser} from 'mailparser';
 import {getTemplate, hasTemplate, saveEmail} from '../store';
 import {z} from 'zod';
 import {charsetDataSchema, emailAddressListSchema} from '../validation';
-import { getCurrentTimestamp, getMessageId } from '../util';
+import {getCurrentTimestamp, getMessageId} from '../util';
 
 const sendEmailSchema = z.object({
 	ConfigurationSetName: z.string().optional(),
@@ -30,15 +30,19 @@ const sendEmailSchema = z.object({
 			// TemplateArn
 			// TemplateContent
 			TemplateData: z.string().optional().transform((TemplateData) => {
-				if (!TemplateData) return;
+				if (!TemplateData) {
+					return;
+				}
 
 				const templateDataMap = new Map<string, string>();
 				for (const [key, value] of Object.entries(JSON.parse(TemplateData))) {
 					if (typeof value !== 'string') {
 						throw new Error(`aws-ses-v2-local: TemplateData value for key "${key}" must be a string.`);
 					}
+
 					templateDataMap.set(key, value);
 				}
+
 				return templateDataMap;
 			}),
 			TemplateName: z.string().optional(),
@@ -79,13 +83,16 @@ const handler: RequestHandler = (req, res, next) => {
 };
 
 const expandDataIntoTemplate = (template: string, data?: Map<string, string>): string => {
-	return data ? template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-		const value = data.get(key);
-		if (value === undefined) {
-			throw new Error(`Template data missing for key: ${key}`);
-		}
-		return value;
-	}) : template;
+	return data
+		? template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+			const value = data.get(key);
+			if (value === undefined) {
+				throw new Error(`Template data missing for key: ${key}`);
+			}
+
+			return value;
+		})
+		: template;
 };
 
 const handleSimple: RequestHandler = async (req, res) => {
@@ -167,7 +174,12 @@ const handleRaw: RequestHandler = async (req, res) => {
 
 const handleTemplate: RequestHandler = (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
-	const { TemplateName, TemplateData } = data.Content?.Template!
+	if (!data.Content?.Template) {
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have data.'});
+		return;
+	}
+
+	const {TemplateName, TemplateData} = data.Content.Template;
 
 	if (!TemplateName) {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name.'});

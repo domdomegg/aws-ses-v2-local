@@ -1,7 +1,7 @@
 import type {RequestHandler} from 'express';
 import {saveEmail} from '../store';
 import {z} from 'zod';
-import { getCurrentTimestamp, getMessageId } from '../util';
+import {getCurrentTimestamp, getMessageId} from '../util';
 
 const sendEmailSchema = z.object({
 	Action: z.literal('SendEmail'),
