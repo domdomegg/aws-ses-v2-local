@@ -4,6 +4,7 @@ import {
 } from '../store';
 import isEmailValid from '../isEmailValid';
 import {z} from 'zod';
+import { getCurrentTimestamp } from '../util';
 
 type Replacement = {
 	Name: string;
@@ -152,7 +153,7 @@ const handler: RequestHandler = (req, res, next) => {
 				text,
 			},
 			attachments: [],
-			at: Math.floor(new Date().getTime() / 1000),
+			at: getCurrentTimestamp(),
 		};
 
 		saveEmail(email);
