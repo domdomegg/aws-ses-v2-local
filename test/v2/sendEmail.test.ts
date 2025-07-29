@@ -1,5 +1,5 @@
 import {test, expect} from 'vitest';
-import {SESv2Client, SendEmailCommand} from '@aws-sdk/client-sesv2';
+import {SESv2Client, SendEmailCommand, CreateEmailTemplateCommand} from '@aws-sdk/client-sesv2';
 import axios from 'axios';
 import {type Store} from '../../src/store';
 import {baseURL} from '../globals';
@@ -151,4 +151,131 @@ Content-Transfer-Encoding: 8bit
 			subject: 'Test email sent to aws-ses-v2-local!',
 		},
 	]);
+});
+
+test('can send template email with v2 API', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	// まずテンプレートを作成
+	const templateName = 'test-template';
+	const templateContent = {
+		Subject: 'Hello {{name}}!',
+		Html: '<h1>Welcome {{name}}</h1><p>Your order {{orderNumber}} is confirmed.</p>',
+		Text: 'Welcome {{name}}\n\nYour order {{orderNumber}} is confirmed.',
+	};
+
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: templateContent,
+	}));
+
+	// テンプレートを使ってメールを送信
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com']},
+		Content: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({
+					name: 'John Doe',
+					orderNumber: '12345',
+				}),
+			},
+		},
+	}));
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	expect(s.emails).toMatchObject([
+		{
+			at: expect.any(Number),
+			attachments: [],
+			body: {
+				html: '<h1>Welcome John Doe</h1><p>Your order 12345 is confirmed.</p>',
+				text: 'Welcome John Doe\n\nYour order 12345 is confirmed.',
+			},
+			destination: {
+				bcc: [],
+				cc: [],
+				to: [
+					'receiver@example.com',
+				],
+			},
+			from: 'sender@example.com',
+			messageId: expect.any(String),
+			replyTo: [],
+			subject: 'Hello John Doe!',
+		},
+	]);
+});
+
+test('can send template email with partial template data', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	// 部分的なテンプレートを作成（HTMLのみ）
+	const templateName = 'test-template-partial';
+	const templateContent = {
+		Subject: 'Notification for {{username}}',
+		Html: '<p>Hello {{username}}, this is a notification.</p>',
+	};
+
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: templateContent,
+	}));
+
+	// テンプレートを使ってメールを送信
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'noreply@example.com',
+		Destination: {
+			ToAddresses: ['user@example.com'],
+			CcAddresses: ['admin@example.com'],
+		},
+		Content: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({
+					username: 'alice',
+				}),
+			},
+		},
+	}));
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	// 最新のメールを確認（配列の最後の要素）
+	const latestEmail = s.emails[s.emails.length - 1];
+	expect(latestEmail).toMatchObject({
+		at: expect.any(Number),
+		attachments: [],
+		body: {
+			html: '<p>Hello alice, this is a notification.</p>',
+			text: '',
+		},
+		destination: {
+			bcc: [],
+			cc: ['admin@example.com'],
+			to: ['user@example.com'],
+		},
+		from: 'noreply@example.com',
+		messageId: expect.any(String),
+		replyTo: [],
+		subject: 'Notification for alice',
+	});
 });
