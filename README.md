@@ -14,7 +14,7 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 
 - SES V1 SendEmail endpoint
 - SES V1 SendRawEmail endpoint
-- SES V2 SendEmail endpoint (both Simple and Raw)
+- SES V2 SendEmail endpoint (both Simple, Raw and Template)
 - SES V2 createEmailTemplate endpoint
 - SES V2 deleteEmailTemplate endpoint
 - SES V2 getAccount endpoint (returns the content of the AWS_SES_ACCOUNT env variable)
