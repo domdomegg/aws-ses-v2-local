@@ -1,6 +1,7 @@
 import type {RequestHandler} from 'express';
 import {saveEmail} from '../store';
 import {z} from 'zod';
+import {getCurrentTimestamp, getMessageId} from '../util';
 
 const sendEmailSchema = z.object({
 	Action: z.literal('SendEmail'),
@@ -40,7 +41,7 @@ const handler: RequestHandler = async (req, res) => {
 		return;
 	}
 
-	const messageId = `ses-${Math.floor((Math.random() * 900000000) + 100000000)}`;
+	const messageId = getMessageId();
 
 	saveEmail({
 		messageId,
@@ -57,7 +58,7 @@ const handler: RequestHandler = async (req, res) => {
 			html: result.data['Message.Body.Html.Data'],
 		},
 		attachments: [],
-		at: Math.floor(new Date().getTime() / 1000),
+		at: getCurrentTimestamp(),
 	});
 
 	res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><SendEmailResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/"><SendEmailResult><MessageId>${messageId}</MessageId></SendEmailResult></SendEmailResponse>`);

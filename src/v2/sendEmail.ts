@@ -1,8 +1,9 @@
 import type {RequestHandler} from 'express';
 import {type AddressObject, simpleParser} from 'mailparser';
-import {saveEmail} from '../store';
+import {getTemplate, hasTemplate, saveEmail} from '../store';
 import {z} from 'zod';
 import {charsetDataSchema, emailAddressListSchema} from '../validation';
+import {getCurrentTimestamp, getMessageId} from '../util';
 
 const sendEmailSchema = z.object({
 	ConfigurationSetName: z.string().optional(),
@@ -24,8 +25,26 @@ const sendEmailSchema = z.object({
 			Subject: charsetDataSchema,
 		}).optional(),
 		Template: z.object({
-			TemplateArn: z.string().optional(),
-			TemplateData: z.string().optional(),
+			// Attachments
+			// Headers
+			// TemplateArn
+			// TemplateContent
+			TemplateData: z.string().optional().transform((TemplateData) => {
+				if (!TemplateData) {
+					return;
+				}
+
+				const templateDataMap = new Map<string, string>();
+				for (const [key, value] of Object.entries(JSON.parse(TemplateData))) {
+					if (typeof value !== 'string') {
+						throw new Error(`aws-ses-v2-local: TemplateData value for key "${key}" must be a string.`);
+					}
+
+					templateDataMap.set(key, value);
+				}
+
+				return templateDataMap;
+			}),
 			TemplateName: z.string().optional(),
 		}).optional(),
 	}),
@@ -56,9 +75,24 @@ const handler: RequestHandler = (req, res, next) => {
 		handleSimple(req, res, next);
 	} else if (result.data.Content?.Raw) {
 		handleRaw(req, res, next);
+	} else if (result.data.Content?.Template) {
+		handleTemplate(req, res, next);
 	} else {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have either Simple or Raw content. Want to add support for other types of emails? Open a PR!'});
 	}
+};
+
+const expandDataIntoTemplate = (template: string, data?: Map<string, string>): string => {
+	return data
+		? template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+			const value = data.get(key);
+			if (value === undefined) {
+				throw new Error(`Template data missing for key: ${key}`);
+			}
+
+			return value;
+		})
+		: template;
 };
 
 const handleSimple: RequestHandler = async (req, res) => {
@@ -74,11 +108,11 @@ const handleSimple: RequestHandler = async (req, res) => {
 	}
 
 	if (!data.FromEmailAddress) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a from email address. Want to add support for other types of emails? Open a PR!'});
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a from email address.'});
 		return;
 	}
 
-	const messageId = `ses-${Math.floor((Math.random() * 900000000) + 100000000)}`;
+	const messageId = getMessageId();
 
 	saveEmail({
 		messageId,
@@ -95,7 +129,7 @@ const handleSimple: RequestHandler = async (req, res) => {
 			text: data.Content.Simple.Body.Text?.Data,
 		},
 		attachments: [],
-		at: Math.floor(new Date().getTime() / 1000),
+		at: getCurrentTimestamp(),
 	});
 
 	res.status(200).send({MessageId: messageId});
@@ -103,8 +137,6 @@ const handleSimple: RequestHandler = async (req, res) => {
 
 const handleRaw: RequestHandler = async (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
-	const messageId = `ses-${Math.floor((Math.random() * 900000000) + 100000000)}`;
-
 	if (!data.Content?.Raw?.Data) {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have data.'});
 		return;
@@ -116,6 +148,8 @@ const handleRaw: RequestHandler = async (req, res) => {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have a from address.'});
 		return;
 	}
+
+	const messageId = getMessageId();
 
 	saveEmail({
 		messageId,
@@ -132,7 +166,59 @@ const handleRaw: RequestHandler = async (req, res) => {
 			html: message.html || undefined,
 		},
 		attachments: message.attachments.map((a) => ({...a, content: a.content.toString('base64')})),
-		at: Math.floor(new Date().getTime() / 1000),
+		at: getCurrentTimestamp(),
+	});
+
+	res.status(200).send({MessageId: messageId});
+};
+
+const handleTemplate: RequestHandler = (req, res) => {
+	const data = sendEmailSchema.parse(req.body);
+	if (!data.Content?.Template) {
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have data.'});
+		return;
+	}
+
+	const {TemplateName, TemplateData} = data.Content.Template;
+
+	if (!TemplateName) {
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name.'});
+		return;
+	}
+
+	if (!data.FromEmailAddress) {
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a from email address.'});
+		return;
+	}
+
+	const template = getTemplate(TemplateName);
+	if (!hasTemplate(TemplateName) || !template?.TemplateName || !template?.TemplateContent) {
+		res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+		return;
+	}
+
+	const messageId = getMessageId();
+
+	const subject = expandDataIntoTemplate(template.TemplateContent.Subject ?? '', TemplateData) ?? '';
+	const htmlBody = expandDataIntoTemplate(template.TemplateContent.Html ?? '', TemplateData) ?? '';
+	const textBody = expandDataIntoTemplate(template.TemplateContent.Text ?? '', TemplateData) ?? '';
+
+	saveEmail({
+		messageId,
+		from: data.FromEmailAddress,
+		replyTo: data.ReplyToAddresses ?? [],
+		destination: {
+			to: data.Destination?.ToAddresses ?? [],
+			cc: data.Destination?.CcAddresses ?? [],
+			bcc: data.Destination?.BccAddresses ?? [],
+		},
+		subject,
+		body: {
+			html: htmlBody,
+			text: textBody,
+		},
+		attachments: [],
+		at: getCurrentTimestamp(),
 	});
 
 	res.status(200).send({MessageId: messageId});

@@ -2,6 +2,7 @@ import type {RequestHandler} from 'express';
 import {type AddressObject, simpleParser} from 'mailparser';
 import {saveEmail} from '../store';
 import {z} from 'zod';
+import {getCurrentTimestamp, getMessageId} from '../util';
 
 const sendRawEmailSchema = z.object({
 	Action: z.literal('SendRawEmail'),
@@ -23,7 +24,7 @@ const handler: RequestHandler = async (req, res) => {
 		return;
 	}
 
-	const messageId = `ses-${Math.floor((Math.random() * 900000000) + 100000000)}`;
+	const messageId = getMessageId();
 
 	const message = await simpleParser(Buffer.from(result.data['RawMessage.Data'], 'base64'));
 	const from = message.from?.text ?? result.data.Source;
@@ -47,7 +48,7 @@ const handler: RequestHandler = async (req, res) => {
 			html: message.html || undefined,
 		},
 		attachments: message.attachments.map((a) => ({...a, content: a.content.toString('base64')})),
-		at: Math.floor(new Date().getTime() / 1000),
+		at: getCurrentTimestamp(),
 	});
 
 	res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><SendRawEmailResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/"><SendRawEmailResult><MessageId>${messageId}</MessageId></SendRawEmailResult></SendRawEmailResponse>`);
