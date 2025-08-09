@@ -7,6 +7,7 @@ import v2CreateEmailTemplate from './v2/createEmailTemplate';
 import v2GetEmailTemplate from './v2/getEmailTemplate';
 import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
 import v2GetAccount from './v2/getAccount';
+import v2ListEmailTemplates from './v2/listEmailTemplates';
 import v2SendEmail from './v2/sendEmail';
 import v2SendBulkEmail from './v2/sendBulkEmail';
 import {getStoreReadonly, clearStore} from './store';
@@ -42,10 +43,11 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 	});
 
 	app.get('/store', (req, res) => {
-		const store = getStoreReadonly();
+		const {templates: templatesMap, emails} = getStoreReadonly();
+		const templates = Object.fromEntries(templatesMap);
 
 		if (!req.query.since) {
-			res.status(200).send(store);
+			res.status(200).send({templates, emails});
 			return;
 		}
 
@@ -58,7 +60,7 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 			res.status(400).send({message: 'Bad since query param, expected integer representing epoch timestamp in seconds'});
 		}
 
-		res.status(200).send({...store, emails: store.emails.filter((e) => e.at >= since)});
+		res.status(200).send({templates, emails: emails.filter((e) => e.at >= since)});
 	});
 
 	app.get('/health-check', (req, res) => {
@@ -112,6 +114,7 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 	});
 
 	// SES V2 - template handling.
+	app.get('/v2/email/templates', v2ListEmailTemplates);
 	app.post('/v2/email/templates', v2CreateEmailTemplate);
 	app.get('/v2/email/templates/:TemplateName', v2GetEmailTemplate);
 	app.delete('/v2/email/templates/:TemplateName', v2DeleteEmailTemplate);
