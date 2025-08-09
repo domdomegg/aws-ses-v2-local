@@ -4,7 +4,7 @@ import {
 } from '../store';
 
 const handler: RequestHandler = (req, res) => {
-	const result = templateSchema.safeParse(req.body);
+	const result = templateSchema.safeParse({...req.body, CreatedTimestamp: Date.now() / 1000});
 	if (!result.success) {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
 		return;

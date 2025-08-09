@@ -15,7 +15,13 @@ const handler: RequestHandler = (req, res) => {
 		return;
 	}
 
-	res.status(200).send(template);
+	const {
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		CreatedTimestamp,
+		...rest
+	} = template;
+
+	res.status(200).send(rest);
 };
 
 export default handler;

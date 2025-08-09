@@ -32,6 +32,7 @@ export const templateSchema = z.object({
 		Text: z.string().optional(),
 	}),
 	TemplateName: z.string(),
+	CreatedTimestamp: z.number().min(0),
 });
 
 export type Template = z.infer<typeof templateSchema>;
