@@ -3,7 +3,7 @@
 PRs are welcomed! To get started developing:
 1. Install Node.js and NPM
 2. Install dependencies with `npm install`
-3. Run `npm start` to run the server
+3. Run `npm run dev` to run the dev server
 4. Run `npm test` to run tests with Jest
 
 You can run `FILL_DEMO=true npm run test -- 'test/demo.test.ts'` to populate sample data into your locally running server.
