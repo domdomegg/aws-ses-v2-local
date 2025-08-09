@@ -19,7 +19,8 @@
     "branding"
   ],
   "scripts": {
-    "start": "npm run build && node dist/cli.js",
+    "dev": "npm run build:watch && npm run start",
+    "start": "nodemon ./dist/cli.js",
     "test": "vitest run && npm run test:binary_exists",
     "test:binary_exists": "npm run prepublishOnly && node -e \"require('fs').access(require('./package.json').bin['aws-ses-v2-local'], (err) => process.exit(err ? 1 : 0))\"",
     "test:watch": "vitest",
@@ -27,6 +28,7 @@
     "format": "eslint --fix",
     "clean": "rm -rf dist",
     "build": "tsc --project tsconfig.build.json",
+    "build:watch": "npm run build --watch",
     "prepublishOnly": "npm run clean && npm run build",
     "build:docker": "docker build -t $DOCKER_IMAGE .",
     "publish:docker": "docker push $DOCKER_IMAGE"
@@ -42,6 +44,7 @@
     "axios": "^1.9.0",
     "eslint": "^9.28.0",
     "eslint-config-domdomegg": "^2.0.8",
+    "nodemon": "^3.1.10",
     "tsconfig-domdomegg": "^1.0.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.3"
