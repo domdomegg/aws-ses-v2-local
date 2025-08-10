@@ -160,7 +160,6 @@ test('can send template email with v2 API', async () => {
 		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
 	});
 
-	// まずテンプレートを作成
 	const templateName = 'test-template';
 	const templateContent = {
 		Subject: 'Hello {{name}}!',
@@ -173,7 +172,6 @@ test('can send template email with v2 API', async () => {
 		TemplateContent: templateContent,
 	}));
 
-	// テンプレートを使ってメールを送信
 	await ses.send(new SendEmailCommand({
 		FromEmailAddress: 'sender@example.com',
 		Destination: {ToAddresses: ['receiver@example.com']},
@@ -224,7 +222,6 @@ test('can send template email with partial template data', async () => {
 		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
 	});
 
-	// 部分的なテンプレートを作成（HTMLのみ）
 	const templateName = 'test-template-partial';
 	const templateContent = {
 		Subject: 'Notification for {{username}}',
@@ -236,7 +233,6 @@ test('can send template email with partial template data', async () => {
 		TemplateContent: templateContent,
 	}));
 
-	// テンプレートを使ってメールを送信
 	await ses.send(new SendEmailCommand({
 		FromEmailAddress: 'noreply@example.com',
 		Destination: {
@@ -259,7 +255,6 @@ test('can send template email with partial template data', async () => {
 		url: '/store',
 	})).data;
 
-	// 最新のメールを確認（配列の最後の要素）
 	const latestEmail = s.emails[s.emails.length - 1];
 	expect(latestEmail).toMatchObject({
 		at: expect.any(Number),
