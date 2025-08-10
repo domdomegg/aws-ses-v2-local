@@ -1,0 +1,15 @@
+services:
+  workspace:
+    build: .
+    command: sleep infinity
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspaces/aws-ses-v2-local
+        consistency: cached
+    working_dir: /workspace
+    environment:
+      AWS_ENDPOINT_URL: http://localhost:8005
+      AWS_DEFAULT_REGION: aws-ses-v2-local
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
