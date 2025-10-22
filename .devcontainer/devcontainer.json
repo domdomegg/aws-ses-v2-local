@@ -1,0 +1,64 @@
+{
+  "name": "aws-ses-v2-local",
+  "dockerComposeFile": "compose.yaml",
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/aws-ses-v2-local",
+  "postCreateCommand": ".devcontainer/postCreateCommand.sh",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {},
+    "ghcr.io/devcontainers-extra/features/shfmt:1": {},
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/dhoeric/features/hadolint:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Docker
+        "exiasr.hadolint",
+        // JavaScript & TypeScript
+        "dbaeumer.vscode-eslint",
+        "yoavbls.pretty-ts-errors",
+        // Shell
+        "foxundermoon.shell-format",
+        "timonwong.shellcheck",
+        // Utility
+        "dotenv.dotenv-vscode",
+        "eamodio.gitlens",
+        "GitHub.copilot",
+        "gruntfuggly.todo-tree",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        // Shell
+        "shellformat.flag": "-s",
+        "shellformat.path": "/usr/local/bin/shfmt",
+        // Terminal
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.scrollback": 100000,
+        // Spell Checker
+        "cSpell.words": [
+        ],
+        // ESLint
+        "eslint.enable": true,
+        "eslint.useFlatConfig": true,
+        "eslint.format.enable": true,
+        "eslint.options": {
+          "overrideConfigFile": "./eslint.config.mjs"
+        },
+        "[typescript][javascript]": {
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          },
+          "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+          "editor.formatOnSave": true
+        },
+        // Other
+        "files.associations": {
+          "Dockerfile*": "dockerfile"
+        },
+        "aws.telemetry": false
+      }
+    }
+  }
+}
