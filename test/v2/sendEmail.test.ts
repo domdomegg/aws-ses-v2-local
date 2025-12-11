@@ -274,3 +274,238 @@ test('can send template email with partial template data', async () => {
 		subject: 'Notification for alice',
 	});
 });
+
+test('can send simple email with single attachment', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const pdfContent = Buffer.from('fake pdf content').toString('base64');
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com']},
+		Content: {
+			Simple: {
+				Subject: {Data: 'Email with attachment'},
+				Body: {Text: {Data: 'Please see the attached document.'}},
+				Attachments: [{
+					FileName: 'document.pdf',
+					RawContent: new Uint8Array(Buffer.from(pdfContent, 'base64')),
+					ContentType: 'application/pdf',
+				}],
+			},
+		},
+	}));
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	const latestEmail = s.emails[s.emails.length - 1];
+	expect(latestEmail).toMatchObject({
+		at: expect.any(Number),
+		attachments: [{
+			content: pdfContent,
+			contentType: 'application/pdf',
+			filename: 'document.pdf',
+			size: 16, // Buffer.from('fake pdf content').length
+		}],
+		body: {
+			text: 'Please see the attached document.',
+		},
+		destination: {
+			bcc: [],
+			cc: [],
+			to: ['receiver@example.com'],
+		},
+		from: 'sender@example.com',
+		messageId: expect.any(String),
+		replyTo: [],
+		subject: 'Email with attachment',
+	});
+});
+
+test('can send simple email with multiple attachments', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const pdfContent = Buffer.from('pdf document').toString('base64');
+	const imageContent = Buffer.from('image data').toString('base64');
+	const textContent = Buffer.from('text file').toString('base64');
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com']},
+		Content: {
+			Simple: {
+				Subject: {Data: 'Multiple files attached'},
+				Body: {Html: {Data: '<p>Please review the attached files.</p>'}},
+				Attachments: [
+					{
+						FileName: 'report.pdf',
+						RawContent: new Uint8Array(Buffer.from(pdfContent, 'base64')),
+						ContentType: 'application/pdf',
+					},
+					{
+						FileName: 'chart.png',
+						RawContent: new Uint8Array(Buffer.from(imageContent, 'base64')),
+						ContentType: 'image/png',
+					},
+					{
+						FileName: 'notes.txt',
+						RawContent: new Uint8Array(Buffer.from(textContent, 'base64')),
+						ContentType: 'text/plain',
+					},
+				],
+			},
+		},
+	}));
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	const latestEmail = s.emails[s.emails.length - 1];
+	expect(latestEmail).toBeDefined();
+	expect(latestEmail!.attachments).toHaveLength(3);
+	expect(latestEmail!.attachments).toMatchObject([
+		{
+			content: pdfContent,
+			contentType: 'application/pdf',
+			filename: 'report.pdf',
+			size: 12,
+		},
+		{
+			content: imageContent,
+			contentType: 'image/png',
+			filename: 'chart.png',
+			size: 10,
+		},
+		{
+			content: textContent,
+			contentType: 'text/plain',
+			filename: 'notes.txt',
+			size: 9,
+		},
+	]);
+});
+
+test('can send simple email with attachment without ContentType', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const binaryContent = Buffer.from('binary data').toString('base64');
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com']},
+		Content: {
+			Simple: {
+				Subject: {Data: 'Binary attachment'},
+				Body: {Text: {Data: 'File attached'}},
+				Attachments: [{
+					FileName: 'data.bin',
+					RawContent: new Uint8Array(Buffer.from(binaryContent, 'base64')),
+				}],
+			},
+		},
+	}));
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	const latestEmail = s.emails[s.emails.length - 1];
+	expect(latestEmail).toBeDefined();
+	expect(latestEmail!.attachments[0]).toMatchObject({
+		content: binaryContent,
+		contentType: 'application/octet-stream',
+		filename: 'data.bin',
+		size: 11,
+	});
+});
+
+test('can send template email with attachment', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'template-with-attachment';
+	const templateContent = {
+		Subject: 'Invoice for {{customer}}',
+		Html: '<h1>Invoice</h1><p>Dear {{customer}}, please find your invoice attached.</p>',
+		Text: 'Invoice\n\nDear {{customer}}, please find your invoice attached.',
+	};
+
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: templateContent,
+	}));
+
+	const invoiceContent = Buffer.from('invoice pdf data').toString('base64');
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'billing@example.com',
+		Destination: {ToAddresses: ['customer@example.com']},
+		Content: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({
+					customer: 'John Smith',
+				}),
+				Attachments: [{
+					FileName: 'invoice.pdf',
+					RawContent: new Uint8Array(Buffer.from(invoiceContent, 'base64')),
+					ContentType: 'application/pdf',
+				}],
+			},
+		},
+	}));
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	const latestEmail = s.emails[s.emails.length - 1];
+	expect(latestEmail).toMatchObject({
+		at: expect.any(Number),
+		attachments: [{
+			content: invoiceContent,
+			contentType: 'application/pdf',
+			filename: 'invoice.pdf',
+			size: 16,
+		}],
+		body: {
+			html: '<h1>Invoice</h1><p>Dear John Smith, please find your invoice attached.</p>',
+			text: 'Invoice\n\nDear John Smith, please find your invoice attached.',
+		},
+		destination: {
+			bcc: [],
+			cc: [],
+			to: ['customer@example.com'],
+		},
+		from: 'billing@example.com',
+		messageId: expect.any(String),
+		replyTo: [],
+		subject: 'Invoice for John Smith',
+	});
+});
