@@ -5,6 +5,18 @@ import {z} from 'zod';
 import {charsetDataSchema, emailAddressListSchema} from '../validation';
 import {getCurrentTimestamp, getMessageId} from '../util';
 
+const attachmentSchema = z.object({
+	FileName: z.string(),
+	RawContent: z.string(), // base64-encoded blob
+	ContentType: z.string().optional(),
+	ContentDescription: z.string().optional(),
+	ContentDisposition: z.string().optional(),
+	ContentId: z.string().optional(),
+	ContentTransferEncoding: z.string().optional(),
+});
+
+type Attachment = z.infer<typeof attachmentSchema>;
+
 const sendEmailSchema = z.object({
 	ConfigurationSetName: z.string().optional(),
 	Content: z.object({
@@ -23,9 +35,10 @@ const sendEmailSchema = z.object({
 				}).optional(),
 			}),
 			Subject: charsetDataSchema,
+			Attachments: z.array(attachmentSchema).optional(),
 		}).optional(),
 		Template: z.object({
-			// Attachments
+			Attachments: z.array(attachmentSchema).optional(),
 			// Headers
 			// TemplateArn
 			// TemplateContent
@@ -95,6 +108,20 @@ const expandDataIntoTemplate = (template: string, data?: Map<string, string>): s
 		: template;
 };
 
+const transformAttachments = (attachments?: Attachment[]) => {
+	return (attachments ?? []).map((att) => {
+		const content = Buffer.from(att.RawContent, 'base64');
+		return {
+			content: att.RawContent,
+			contentType: att.ContentType ?? 'application/octet-stream',
+			contentDisposition: att.ContentDisposition,
+			contentId: att.ContentId,
+			filename: att.FileName,
+			size: content.length,
+		};
+	});
+};
+
 const handleSimple: RequestHandler = async (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
 	if (!data.Content?.Simple?.Body?.Html?.Data && !data.Content?.Simple?.Body?.Text?.Data) {
@@ -114,6 +141,8 @@ const handleSimple: RequestHandler = async (req, res) => {
 
 	const messageId = getMessageId();
 
+	const attachments = transformAttachments(data.Content.Simple.Attachments);
+
 	saveEmail({
 		messageId,
 		from: data.FromEmailAddress,
@@ -128,7 +157,7 @@ const handleSimple: RequestHandler = async (req, res) => {
 			html: data.Content.Simple.Body.Html?.Data,
 			text: data.Content.Simple.Body.Text?.Data,
 		},
-		attachments: [],
+		attachments,
 		at: getCurrentTimestamp(),
 	});
 
@@ -203,6 +232,8 @@ const handleTemplate: RequestHandler = (req, res) => {
 	const htmlBody = expandDataIntoTemplate(template.TemplateContent.Html ?? '', TemplateData) ?? '';
 	const textBody = expandDataIntoTemplate(template.TemplateContent.Text ?? '', TemplateData) ?? '';
 
+	const attachments = transformAttachments(data.Content.Template.Attachments);
+
 	saveEmail({
 		messageId,
 		from: data.FromEmailAddress,
@@ -217,7 +248,7 @@ const handleTemplate: RequestHandler = (req, res) => {
 			html: htmlBody,
 			text: textBody,
 		},
-		attachments: [],
+		attachments,
 		at: getCurrentTimestamp(),
 	});
 
