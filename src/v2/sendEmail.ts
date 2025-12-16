@@ -109,12 +109,17 @@ const expandDataIntoTemplate = (template: string, data?: Map<string, string>): s
 };
 
 const transformAttachments = (attachments?: Attachment[]) => {
-	return (attachments ?? []).map((att) => ({
-		content: att.RawContent,
-		contentType: att.ContentType ?? 'application/octet-stream',
-		filename: att.FileName,
-		size: Buffer.from(att.RawContent, 'base64').length,
-	}));
+	return (attachments ?? []).map((att) => {
+		const content = Buffer.from(att.RawContent, 'base64');
+		return {
+			content: att.RawContent,
+			contentType: att.ContentType ?? 'application/octet-stream',
+			contentDisposition: att.ContentDisposition,
+			contentId: att.ContentId,
+			filename: att.FileName,
+			size: content.length,
+		};
+	});
 };
 
 const handleSimple: RequestHandler = async (req, res) => {
