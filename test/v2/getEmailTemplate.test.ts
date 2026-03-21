@@ -41,6 +41,18 @@ test('returns error when getting non-existent template', async () => {
 	}))).rejects.toThrow();
 });
 
+test('returns error when template name is missing', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	await expect(ses.send(new GetEmailTemplateCommand({
+		TemplateName: '',
+	}))).rejects.toThrow();
+});
+
 test('can get template with only required fields', async () => {
 	const ses = new SESv2Client({
 		endpoint: baseURL,
