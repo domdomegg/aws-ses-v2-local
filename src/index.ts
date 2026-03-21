@@ -114,7 +114,14 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 	});
 
 	// SES V2 - template handling.
-	app.get('/v2/email/templates', v2ListEmailTemplates);
+	app.get('/v2/email/templates', (req, res, next) => {
+		if (req.path.endsWith('/')) {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a template name.'});
+			return;
+		}
+
+		v2ListEmailTemplates(req, res, next);
+	});
 	app.post('/v2/email/templates', v2CreateEmailTemplate);
 	app.get('/v2/email/templates/:TemplateName', v2GetEmailTemplate);
 	app.delete('/v2/email/templates/:TemplateName', v2DeleteEmailTemplate);
