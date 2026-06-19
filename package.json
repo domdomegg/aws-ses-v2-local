@@ -51,7 +51,7 @@
   "dependencies": {
     "express": "^4.18.2",
     "mailparser": "^3.7.3",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^9.0.1",
     "yargs": "^17.6.0",
     "zod": "^3.25.63"
   }
