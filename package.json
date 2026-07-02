@@ -50,6 +50,7 @@
   },
   "dependencies": {
     "express": "^5.2.1",
+    "handlebars": "^4.7.9",
     "mailparser": "^3.9.12",
     "nodemailer": "^9.0.3",
     "yargs": "^18.0.0",

@@ -509,3 +509,134 @@ test('can send template email with attachment', async () => {
 		subject: 'Invoice for John Smith',
 	});
 });
+
+test('can send template email with whitespace around template variables', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'test-template-whitespace';
+	const templateContent = {
+		Subject: 'Hello {{ name }}!',
+		Html: '<h1>Welcome {{name}}</h1><p>Your order {{  orderNumber  }} is confirmed.</p>',
+		Text: 'Welcome {{ name}}\n\nYour order {{orderNumber }} is confirmed.',
+	};
+
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: templateContent,
+	}));
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com']},
+		Content: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({
+					name: 'John Doe',
+					orderNumber: '12345',
+				}),
+			},
+		},
+	}));
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	expect(s.emails).toContainEqual(expect.objectContaining({
+		body: {
+			html: '<h1>Welcome John Doe</h1><p>Your order 12345 is confirmed.</p>',
+			text: 'Welcome John Doe\n\nYour order 12345 is confirmed.',
+		},
+		subject: 'Hello John Doe!',
+	}));
+});
+
+test('renders advanced Handlebars features without HTML-escaping', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'test-template-advanced';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {
+			Subject: 'Order {{order.id}}',
+			Html: '<ul>{{#each items}}<li>{{this.name}}: {{this.price}}</li>{{/each}}</ul>{{#if vip}}<p>VIP {{raw}}</p>{{/if}}',
+			Text: 'Items: {{#each items}}{{this.name}} {{/each}}',
+		},
+	}));
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'shop@example.com',
+		Destination: {ToAddresses: ['buyer@example.com']},
+		Content: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({
+					order: {id: 'A1'},
+					items: [{name: 'x', price: '1'}, {name: 'y', price: '2'}],
+					vip: true,
+					raw: '<b>bold</b>',
+				}),
+			},
+		},
+	}));
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toContainEqual(expect.objectContaining({
+		subject: 'Order A1',
+		body: {
+			html: '<ul><li>x: 1</li><li>y: 2</li></ul><p>VIP <b>bold</b></p>',
+			text: 'Items: x y ',
+		},
+	}));
+});
+
+test('rejects a template send when a referenced variable is missing', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'test-template-missing-var';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Hi {{name}}'},
+	}));
+
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'noreply@example.com',
+		Destination: {ToAddresses: ['user@example.com']},
+		Content: {Template: {TemplateName: templateName, TemplateData: JSON.stringify({})}},
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+});
+
+test('rejects a template send when TemplateData is not valid JSON', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'test-template-bad-json';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Hi {{name}}'},
+	}));
+
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'noreply@example.com',
+		Destination: {ToAddresses: ['user@example.com']},
+		Content: {Template: {TemplateName: templateName, TemplateData: 'not json'}},
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+});
