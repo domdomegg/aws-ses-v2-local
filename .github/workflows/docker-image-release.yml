@@ -51,7 +51,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          # No linux/arm/v7: node:lts-alpine stopped publishing it, which
+          # broke the v2.9.0 and v2.9.1 releases at manifest resolution.
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -84,7 +86,7 @@ jobs:
 
           echo ""
           echo "✅ Multi-architecture build verification complete!"
-          echo "Expected platforms: linux/amd64, linux/arm64, linux/arm/v7"
+          echo "Expected platforms: linux/amd64, linux/arm64"
 
           # Verify each platform is present in the manifest
           echo ""
