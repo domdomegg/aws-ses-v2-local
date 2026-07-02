@@ -4,6 +4,7 @@ import {getTemplate, hasTemplate, saveEmail} from '../store';
 import {z} from 'zod';
 import {charsetDataSchema, emailAddressListSchema} from '../validation';
 import {getCurrentTimestamp, getMessageId} from '../util';
+import {parseTemplateData, renderTemplate, TemplateRenderError} from './renderTemplate';
 
 const attachmentSchema = z.object({
 	FileName: z.string(),
@@ -42,22 +43,7 @@ const sendEmailSchema = z.object({
 			// Headers
 			// TemplateArn
 			// TemplateContent
-			TemplateData: z.string().optional().transform((TemplateData) => {
-				if (!TemplateData) {
-					return;
-				}
-
-				const templateDataMap = new Map<string, string>();
-				for (const [key, value] of Object.entries(JSON.parse(TemplateData))) {
-					if (typeof value !== 'string') {
-						throw new Error(`aws-ses-v2-local: TemplateData value for key "${key}" must be a string.`);
-					}
-
-					templateDataMap.set(key, value);
-				}
-
-				return templateDataMap;
-			}),
+			TemplateData: z.string().optional(),
 			TemplateName: z.string().optional(),
 		}).optional(),
 	}),
@@ -93,19 +79,6 @@ const handler: RequestHandler = (req, res, next) => {
 	} else {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have either Simple or Raw content. Want to add support for other types of emails? Open a PR!'});
 	}
-};
-
-const expandDataIntoTemplate = (template: string, data?: Map<string, string>): string => {
-	return data
-		? template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-			const value = data.get(key);
-			if (value === undefined) {
-				throw new Error(`Template data missing for key: ${key}`);
-			}
-
-			return value;
-		})
-		: template;
 };
 
 const transformAttachments = (attachments?: Attachment[]) => {
@@ -226,11 +199,29 @@ const handleTemplate: RequestHandler = (req, res) => {
 		return;
 	}
 
-	const messageId = getMessageId();
+	const templateData = parseTemplateData(TemplateData);
+	if (templateData instanceof Error) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: ${templateData.message}`});
+		return;
+	}
 
-	const subject = expandDataIntoTemplate(template.TemplateContent.Subject ?? '', TemplateData) ?? '';
-	const htmlBody = expandDataIntoTemplate(template.TemplateContent.Html ?? '', TemplateData) ?? '';
-	const textBody = expandDataIntoTemplate(template.TemplateContent.Text ?? '', TemplateData) ?? '';
+	let subject: string;
+	let htmlBody: string;
+	let textBody: string;
+	try {
+		subject = renderTemplate(template.TemplateContent.Subject ?? '', templateData);
+		htmlBody = renderTemplate(template.TemplateContent.Html ?? '', templateData);
+		textBody = renderTemplate(template.TemplateContent.Text ?? '', templateData);
+	} catch (error: unknown) {
+		if (error instanceof TemplateRenderError) {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
+			return;
+		}
+
+		throw error;
+	}
+
+	const messageId = getMessageId();
 
 	const attachments = transformAttachments(data.Content.Template.Attachments);
 

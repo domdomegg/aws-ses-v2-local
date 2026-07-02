@@ -305,3 +305,180 @@ test('supports multiple destination types (to, cc, bcc)', async () => {
 		replyTo: ['reply@example.com'],
 	});
 });
+
+test('can send bulk email with whitespace around template variables', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-email-template-whitespace';
+
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {
+			Subject: 'Hello {{ name }}!',
+			Html: '<h1>Hello {{name}}!</h1><p>Your age is {{  age  }}</p>',
+			Text: 'Hello {{ name}}! Your age is {{age }}',
+		},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({name: 'Default', age: '25'}),
+			},
+		},
+		BulkEmailEntries: [
+			{
+				Destination: {
+					ToAddresses: ['whitespace@example.com'],
+				},
+				ReplacementEmailContent: {
+					ReplacementTemplate: {
+						ReplacementTemplateData: JSON.stringify({name: 'John', age: '30'}),
+					},
+				},
+			},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({
+		method: 'get',
+		baseURL,
+		url: '/store',
+	})).data;
+
+	const lastEmail = s.emails[s.emails.length - 1];
+	expect(lastEmail).toMatchObject({
+		subject: 'Hello John!',
+		body: {
+			html: '<h1>Hello John!</h1><p>Your age is 30</p>',
+			text: 'Hello John! Your age is 30',
+		},
+		destination: {
+			to: ['whitespace@example.com'],
+		},
+	});
+});
+
+test('renders per-recipient advanced features and falls back to default data', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-advanced';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {
+			Subject: 'Hi {{name}}',
+			Html: '<ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>',
+		},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({name: 'Default', items: []}),
+			},
+		},
+		BulkEmailEntries: [
+			{
+				Destination: {ToAddresses: ['ann@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: JSON.stringify({name: 'Ann', items: ['x', 'y']})}},
+			},
+			{
+				Destination: {ToAddresses: ['fallback@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: JSON.stringify({})}},
+			},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toContainEqual(expect.objectContaining({
+		subject: 'Hi Ann',
+		body: expect.objectContaining({html: '<ul><li>x</li><li>y</li></ul>'}),
+	}));
+	expect(s.emails).toContainEqual(expect.objectContaining({
+		subject: 'Hi Default',
+		body: expect.objectContaining({html: '<ul></ul>'}),
+	}));
+});
+
+test('marks a recipient FAILED when its data is missing a template variable', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-missing-var';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Bye {{name}}'},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {Template: {TemplateName: templateName}},
+		BulkEmailEntries: [
+			{
+				Destination: {ToAddresses: ['ok@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: JSON.stringify({name: 'Ann'})}},
+			},
+			{
+				Destination: {ToAddresses: ['broken@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: JSON.stringify({})}},
+			},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('FAILED');
+	expect(response.BulkEmailEntryResults?.[1]?.Error).toContain('attribute \'name\'');
+});
+
+test('marks a recipient FAILED when its ReplacementTemplateData is invalid JSON', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-bad-replacement-json';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Bye {{name}}'},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {Template: {TemplateName: templateName, TemplateData: JSON.stringify({name: 'Default'})}},
+		BulkEmailEntries: [
+			{
+				Destination: {ToAddresses: ['ok@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: JSON.stringify({name: 'Ann'})}},
+			},
+			{
+				Destination: {ToAddresses: ['bad@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: 'not json'}},
+			},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('FAILED');
+	expect(response.BulkEmailEntryResults?.[1]?.Error).toBeTruthy();
+});
