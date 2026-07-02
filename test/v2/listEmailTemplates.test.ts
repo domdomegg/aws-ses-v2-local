@@ -160,7 +160,7 @@ describe('ListEmailTemplates - PageSize parameter', () => {
 			expect(response.TemplatesMetadata?.length).toBeLessThanOrEqual(10);
 
 			// Should have NextToken if there are more than 10 templates total
-			if (response.TemplatesMetadata && response.TemplatesMetadata.length === 10) {
+			if (response.TemplatesMetadata?.length === 10) {
 				expect(response.NextToken).toBeDefined();
 				expect(typeof response.NextToken).toBe('string');
 				expect(response.NextToken).toContain('aws-ses-v2-local-mocked-');

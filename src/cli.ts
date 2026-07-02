@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
-import {argv} from 'yargs';
+import yargs from 'yargs';
+import {hideBin} from 'yargs/helpers';
 import server, {type Config} from '.';
 import {getAddress} from './address';
 
 // Parse the command line optional host and port arguments.
 
-const config: Partial<Config> = {};
+const argv = yargs(hideBin(process.argv))
+	.option('host', {type: 'string'})
+	.option('port', {type: 'number'})
+	.parseSync();
 
-if (argv instanceof Promise) {
-	throw new Error('Expected argv to be an object, not a Promise');
-}
+const config: Partial<Config> = {};
 
 if (typeof argv.host === 'string' && argv.host.trim()) {
 	config.host = argv.host;
