@@ -176,3 +176,16 @@ test('returns error when template content is empty object', async () => {
 		},
 	})).rejects.toThrow();
 });
+
+test('rejects a template with malformed Handlebars syntax', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	await expect(ses.send(new CreateEmailTemplateCommand({
+		TemplateName: 'malformed-template',
+		TemplateContent: {Subject: 'Hi', Html: '{{#if x}}unclosed'},
+	}))).rejects.toThrow();
+});

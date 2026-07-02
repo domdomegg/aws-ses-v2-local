@@ -4,7 +4,9 @@ import {getTemplate, hasTemplate, saveEmail} from '../store';
 import {z} from 'zod';
 import {charsetDataSchema, emailAddressListSchema} from '../validation';
 import {getCurrentTimestamp, getMessageId} from '../util';
-import {parseTemplateData, renderTemplate, TemplateRenderError} from './renderTemplate';
+import {
+	compileTemplateParts, parseTemplateData, strictTemplateRenderingEnabled, TemplateRenderError,
+} from './renderTemplate';
 
 const attachmentSchema = z.object({
 	FileName: z.string(),
@@ -209,9 +211,7 @@ const handleTemplate: RequestHandler = (req, res) => {
 	let htmlBody: string;
 	let textBody: string;
 	try {
-		subject = renderTemplate(template.TemplateContent.Subject ?? '', templateData);
-		htmlBody = renderTemplate(template.TemplateContent.Html ?? '', templateData);
-		textBody = renderTemplate(template.TemplateContent.Text ?? '', templateData);
+		({subject, html: htmlBody, text: textBody} = compileTemplateParts(template.TemplateContent, {strict: strictTemplateRenderingEnabled()})(templateData));
 	} catch (error: unknown) {
 		if (error instanceof TemplateRenderError) {
 			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});

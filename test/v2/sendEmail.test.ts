@@ -601,7 +601,7 @@ test('renders advanced Handlebars features without HTML-escaping', async () => {
 	}));
 });
 
-test('rejects a template send when a referenced variable is missing', async () => {
+test('renders a missing template variable as empty by default (SES parity)', async () => {
 	const ses = new SESv2Client({
 		endpoint: baseURL,
 		region: 'aws-ses-v2-local',
@@ -614,11 +614,18 @@ test('rejects a template send when a referenced variable is missing', async () =
 		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Hi {{name}}'},
 	}));
 
-	await expect(ses.send(new SendEmailCommand({
+	await ses.send(new SendEmailCommand({
 		FromEmailAddress: 'noreply@example.com',
 		Destination: {ToAddresses: ['user@example.com']},
 		Content: {Template: {TemplateName: templateName, TemplateData: JSON.stringify({})}},
-	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+	}));
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	const latestEmail = s.emails[s.emails.length - 1];
+	expect(latestEmail).toMatchObject({
+		subject: 'Hi ',
+		body: {text: 'Hi '},
+	});
 });
 
 test('rejects a template send when TemplateData is not valid JSON', async () => {

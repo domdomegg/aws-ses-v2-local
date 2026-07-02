@@ -6,7 +6,7 @@ import isEmailValid from '../isEmailValid';
 import {z} from 'zod';
 import {getCurrentTimestamp} from '../util';
 import {
-	compileTemplate, parseTemplateData, TemplateRenderError, type TemplateData,
+	compileTemplateParts, parseTemplateData, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateData,
 } from './renderTemplate';
 
 type BulkEmailResult = {
@@ -103,24 +103,23 @@ const handler: RequestHandler = (req, res, next) => {
 		return;
 	}
 
-	// Default template replacement data (applied to every recipient unless overridden).
 	const defaultTemplateData = parseTemplateData(defaultContent.Template.TemplateData);
 	if (defaultTemplateData instanceof Error) {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: ${defaultTemplateData.message}`});
 		return;
 	}
 
-	// Compile each template part once; reused for every recipient.
-	let renderSubject: (d: TemplateData) => string;
-	let renderHtml: (d: TemplateData) => string;
-	let renderText: (d: TemplateData) => string;
+	// Compile once; reused for every recipient.
+	const strict = strictTemplateRenderingEnabled();
+	let renderParts: (d: TemplateData) => {subject: string; html: string; text: string};
 	try {
-		renderSubject = compileTemplate(templateSubject);
-		renderHtml = compileTemplate(templateHtml);
-		renderText = compileTemplate(templateText);
+		renderParts = compileTemplateParts({Subject: templateSubject, Html: templateHtml, Text: templateText}, {strict});
 	} catch (error: unknown) {
-		const detail = error instanceof Error ? error.message : String(error);
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${detail}`});
+		if (!(error instanceof TemplateRenderError)) {
+			throw error;
+		}
+
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
 		return;
 	}
 
@@ -140,7 +139,7 @@ const handler: RequestHandler = (req, res, next) => {
 			return;
 		}
 
-		const replacementData = parseTemplateData(entry.ReplacementEmailContent?.ReplacementTemplate?.ReplacementTemplateData);
+		const replacementData = parseTemplateData(entry.ReplacementEmailContent?.ReplacementTemplate?.ReplacementTemplateData, 'ReplacementTemplateData');
 		if (replacementData instanceof Error) {
 			results.push({
 				MessageId: messageId,
@@ -150,16 +149,15 @@ const handler: RequestHandler = (req, res, next) => {
 			return;
 		}
 
-		// Per-recipient data overrides the batch default data (shallow, per SES fallback semantics).
-		const templateData: TemplateData = {...defaultTemplateData, ...replacementData};
+		// Whole-object fallback (SES semantics): defaults apply only when the entry supplies no
+		// replacement data ({} or absent); any replacement data is used on its own, not merged per-key.
+		const templateData: TemplateData = Object.keys(replacementData).length > 0 ? replacementData : defaultTemplateData;
 
 		let subject: string;
 		let html: string;
 		let text: string;
 		try {
-			subject = renderSubject(templateData);
-			html = renderHtml(templateData);
-			text = renderText(templateData);
+			({subject, html, text} = renderParts(templateData));
 		} catch (error: unknown) {
 			if (!(error instanceof TemplateRenderError)) {
 				throw error; // surface unexpected errors instead of masking them as a per-recipient FAILED
@@ -167,7 +165,7 @@ const handler: RequestHandler = (req, res, next) => {
 
 			results.push({
 				MessageId: messageId,
-				Error: `Rendering failure: ${error.message}`,
+				Error: `template rendering failed - ${error.message}`,
 				Status: 'FAILED',
 			});
 			return;

@@ -417,7 +417,7 @@ test('renders per-recipient advanced features and falls back to default data', a
 	}));
 });
 
-test('marks a recipient FAILED when its data is missing a template variable', async () => {
+test('renders missing template variables as empty by default (SES parity)', async () => {
 	const ses = new SESv2Client({
 		endpoint: baseURL,
 		region: 'aws-ses-v2-local',
@@ -446,8 +446,43 @@ test('marks a recipient FAILED when its data is missing a template variable', as
 	}));
 
 	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
-	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('FAILED');
-	expect(response.BulkEmailEntryResults?.[1]?.Error).toContain('attribute \'name\'');
+	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	const brokenEmail = s.emails.find((e) => e.destination.to.includes('broken@example.com'));
+	expect(brokenEmail).toMatchObject({subject: 'Hi ', body: {text: 'Bye '}});
+});
+
+test('does not merge default data into partial replacement data (whole-object fallback)', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-whole-object-fallback';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Age {{age}}'},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {Template: {TemplateName: templateName, TemplateData: JSON.stringify({name: 'Default', age: '25'})}},
+		BulkEmailEntries: [
+			{
+				Destination: {ToAddresses: ['partial@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: JSON.stringify({name: 'Ann'})}},
+			},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	const email = s.emails.find((e) => e.destination.to.includes('partial@example.com'));
+	// age exists only in the defaults, so under whole-object fallback it renders empty (not '25').
+	expect(email).toMatchObject({subject: 'Hi Ann', body: {text: 'Age '}});
 });
 
 test('marks a recipient FAILED when its ReplacementTemplateData is invalid JSON', async () => {

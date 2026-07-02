@@ -1,71 +1,44 @@
 import Handlebars from 'handlebars';
 
-/**
- * Template data is an arbitrary JSON object: values may be strings, numbers,
- * booleans, nested objects, or arrays (arrays/objects are required for
- * {{#each}} and dotted-path access).
- */
+// Values may be strings, numbers, nested objects, or arrays (the latter for {{#each}} and dotted paths).
 export type TemplateData = Record<string, unknown>;
 
-/**
- * Error thrown when a template cannot be rendered — either because the template
- * source is malformed, or because it references a variable that is missing from
- * the supplied template data. `attribute` holds the offending variable name when
- * it can be determined.
- */
 export class TemplateRenderError extends Error {
-	readonly attribute?: string | undefined;
-
-	constructor(message: string, attribute?: string) {
+	constructor(message: string) {
 		super(message);
 		this.name = 'TemplateRenderError';
-		this.attribute = attribute;
 	}
 }
 
 /**
- * Isolated Handlebars environment used to render AWS SES email templates.
- *
- * AWS SES renders stored templates with Handlebars but with two behaviours that
- * differ from the Handlebars defaults, both reproduced here:
- *   - HTML escaping is disabled (SES substitutes values raw), and
- *   - referencing a variable that is missing from the data is a rendering
- *     failure rather than a silent empty string.
- *
- * An isolated instance (created via `Handlebars.create()`) exposes only the
- * built-in helpers — SES does not allow registering custom helpers — and avoids
- * mutating the global Handlebars environment.
+ * By default a missing variable renders as an empty string and the send succeeds,
+ * matching SES (which accepts the request and reports rendering failures
+ * asynchronously). Set AWS_SES_STRICT_TEMPLATE_RENDERING=true to fail fast instead —
+ * a deliberate, SES-divergent local debugging aid. See the README.
  */
+export const strictTemplateRenderingEnabled = (): boolean => process.env.AWS_SES_STRICT_TEMPLATE_RENDERING === 'true';
+
+// Isolated instance: no HTML escaping (SES renders raw) and only built-in helpers (SES forbids custom ones).
 const hb = Handlebars.create();
 
-// Handlebars strict-mode messages look like: `"name" not defined in [object Object] - 1:5`
-// For a dotted path like `{{user.name}}`, Handlebars names only the leaf segment,
-// so `attribute` resolves to `name` (not `user.name`).
-const missingAttributePattern = /"([^"]+)" not defined/;
+// Pass the original Handlebars message through rather than rewriting it, which previously
+// misreported unknown helpers as missing data attributes and coupled us to Handlebars' wording.
+const toRenderError = (error: unknown): TemplateRenderError => new TemplateRenderError(error instanceof Error ? error.message : String(error));
 
-const toRenderError = (error: unknown): TemplateRenderError => {
-	const message = error instanceof Error ? error.message : String(error);
-	const attribute = missingAttributePattern.exec(message)?.[1];
-	if (attribute !== undefined) {
-		return new TemplateRenderError(`attribute '${attribute}' is not present in the template data`, attribute);
-	}
-
-	return new TemplateRenderError(message);
+export type RenderOptions = {
+	strict?: boolean;
 };
 
 /**
- * Compile a template source string once and return a function that renders it
- * against template data. Compiling once and rendering many times is used by the
- * bulk send path, where the same template is applied to many recipients.
+ * Compile a template source once and return a render function. Parses exactly once:
+ * hb.parse validates syntax eagerly (malformed templates throw here) and hb.compile reuses that AST.
  *
- * @throws {TemplateRenderError} for a malformed template (at compile time) or a
- * missing variable (at render time).
+ * @throws {TemplateRenderError} for a malformed template, or a missing variable when strict.
  */
-export const compileTemplate = (source: string): ((data: TemplateData) => string) => {
+export const compileTemplate = (source: string, options: RenderOptions = {}): ((data: TemplateData) => string) => {
 	let render: HandlebarsTemplateDelegate<TemplateData>;
 	try {
-		hb.parse(source); // Eager syntax validation — hb.compile is otherwise lazy and defers parsing to first render.
-		render = hb.compile<TemplateData>(source, {strict: true, noEscape: true});
+		render = hb.compile<TemplateData>(hb.parse(source), {strict: options.strict ?? false, noEscape: true});
 	} catch (error: unknown) {
 		throw toRenderError(error);
 	}
@@ -79,19 +52,28 @@ export const compileTemplate = (source: string): ((data: TemplateData) => string
 	};
 };
 
-/**
- * Compile and render a template in one call. Convenience for the single-send path.
- *
- * @throws {TemplateRenderError}
- */
-export const renderTemplate = (source: string, data: TemplateData): string => compileTemplate(source)(data);
+export const renderTemplate = (source: string, data: TemplateData, options?: RenderOptions): string => compileTemplate(source, options)(data);
 
-/**
- * Parse an AWS SES `TemplateData` / `ReplacementTemplateData` JSON string into a
- * plain object. Returns `{}` for an empty/absent value and an `Error` (rather
- * than throwing) for malformed JSON or a non-object top-level value.
- */
-export const parseTemplateData = (templateData: string | undefined): TemplateData | Error => {
+export type TemplateParts = {
+	Subject?: string | undefined;
+	Html?: string | undefined;
+	Text?: string | undefined;
+};
+
+// Compile a template's three parts once into a single per-data renderer, shared by the send paths.
+export const compileTemplateParts = (parts: TemplateParts, options: RenderOptions = {}): ((data: TemplateData) => {subject: string; html: string; text: string}) => {
+	const renderSubject = compileTemplate(parts.Subject ?? '', options);
+	const renderHtml = compileTemplate(parts.Html ?? '', options);
+	const renderText = compileTemplate(parts.Text ?? '', options);
+	return (data: TemplateData) => ({
+		subject: renderSubject(data),
+		html: renderHtml(data),
+		text: renderText(data),
+	});
+};
+
+// Parse a TemplateData/ReplacementTemplateData JSON string; returns {} when empty and an Error (not thrown) for invalid input.
+export const parseTemplateData = (templateData: string | undefined, fieldName = 'TemplateData'): TemplateData | Error => {
 	if (!templateData) {
 		return {};
 	}
@@ -100,11 +82,11 @@ export const parseTemplateData = (templateData: string | undefined): TemplateDat
 	try {
 		parsed = JSON.parse(templateData);
 	} catch (error: unknown) {
-		return new Error(`Failed to parse template data: ${String(error)}`);
+		return new Error(`Failed to parse ${fieldName}: ${String(error)}`);
 	}
 
 	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-		return new Error('TemplateData must be a JSON object');
+		return new Error(`${fieldName} must be a JSON object`);
 	}
 
 	return parsed as TemplateData;
