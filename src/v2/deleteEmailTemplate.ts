@@ -2,7 +2,9 @@ import type {RequestHandler} from 'express';
 import {hasTemplate, deleteTemplate} from '../store';
 
 const handler: RequestHandler = (req, res) => {
-	const templateName = req.params.TemplateName;
+	// Express 5 types params as string | string[]; this route has one segment.
+	const {TemplateName} = req.params;
+	const templateName = Array.isArray(TemplateName) ? TemplateName[0] : TemplateName;
 
 	if (!templateName) {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a template name.'});
