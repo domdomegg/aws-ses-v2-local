@@ -5,7 +5,7 @@ import {z} from 'zod';
 import {charsetDataSchema, emailAddressListSchema} from '../validation';
 import {getCurrentTimestamp, getMessageId} from '../util';
 import {
-	compileTemplateParts, parseTemplateData, strictTemplateRenderingEnabled, TemplateRenderError,
+	compileTemplateParts, parseTemplateData, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateParts,
 } from './renderTemplate';
 
 const attachmentSchema = z.object({
@@ -42,9 +42,16 @@ const sendEmailSchema = z.object({
 		}).optional(),
 		Template: z.object({
 			Attachments: z.array(attachmentSchema).optional(),
-			// Headers
-			// TemplateArn
-			// TemplateContent
+			Headers: z.array(z.object({
+				Name: z.string(),
+				Value: z.string(),
+			})).optional(),
+			TemplateArn: z.string().optional(),
+			TemplateContent: z.object({
+				Subject: z.string().optional(),
+				Html: z.string().optional(),
+				Text: z.string().optional(),
+			}).optional(),
 			TemplateData: z.string().optional(),
 			TemplateName: z.string().optional(),
 		}).optional(),
@@ -176,17 +183,17 @@ const handleRaw: RequestHandler = async (req, res) => {
 	res.status(200).send({MessageId: messageId});
 };
 
+// arn:aws:ses:<region>:<account>:template/<name>
+const templateNameFromArn = (arn: string): string | undefined => {
+	const marker = ':template/';
+	const idx = arn.indexOf(marker);
+	return idx === -1 ? undefined : arn.slice(idx + marker.length);
+};
+
 const handleTemplate: RequestHandler = (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
 	if (!data.Content?.Template) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have data.'});
-		return;
-	}
-
-	const {TemplateName, TemplateData} = data.Content.Template;
-
-	if (!TemplateName) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name.'});
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have data.'});
 		return;
 	}
 
@@ -195,9 +202,25 @@ const handleTemplate: RequestHandler = (req, res) => {
 		return;
 	}
 
-	const template = getTemplate(TemplateName);
-	if (!hasTemplate(TemplateName) || !template?.TemplateName || !template?.TemplateContent) {
-		res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+	const {
+		TemplateName, TemplateArn, TemplateContent, TemplateData, Headers,
+	} = data.Content.Template;
+
+	// Resolve template parts from a stored template (by name or ARN) or inline content.
+	let templateParts: TemplateParts;
+	const storedName = TemplateName ?? (TemplateArn ? templateNameFromArn(TemplateArn) : undefined);
+	if (storedName) {
+		const template = getTemplate(storedName);
+		if (!hasTemplate(storedName) || !template?.TemplateName || !template?.TemplateContent) {
+			res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+			return;
+		}
+
+		templateParts = template.TemplateContent;
+	} else if (TemplateContent) {
+		templateParts = TemplateContent;
+	} else {
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.'});
 		return;
 	}
 
@@ -211,7 +234,7 @@ const handleTemplate: RequestHandler = (req, res) => {
 	let htmlBody: string;
 	let textBody: string;
 	try {
-		({subject, html: htmlBody, text: textBody} = compileTemplateParts(template.TemplateContent, {strict: strictTemplateRenderingEnabled()})(templateData));
+		({subject, html: htmlBody, text: textBody} = compileTemplateParts(templateParts, {strict: strictTemplateRenderingEnabled()})(templateData));
 	} catch (error: unknown) {
 		if (error instanceof TemplateRenderError) {
 			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
@@ -240,6 +263,7 @@ const handleTemplate: RequestHandler = (req, res) => {
 			text: textBody,
 		},
 		attachments,
+		headers: Headers?.map((h) => ({name: h.Name, value: h.Value})),
 		at: getCurrentTimestamp(),
 	});
 

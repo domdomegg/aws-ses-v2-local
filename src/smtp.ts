@@ -34,6 +34,10 @@ export async function sendEmailToSmtp(email: Email): Promise<void> {
 		data.replyTo = email.replyTo;
 	}
 
+	if (email.headers && email.headers.length > 0) {
+		data.headers = email.headers.map((h) => ({key: h.name, value: h.value}));
+	}
+
 	try {
 		await transporter.sendMail(data);
 	} catch (err) {

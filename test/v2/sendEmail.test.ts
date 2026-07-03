@@ -647,3 +647,118 @@ test('rejects a template send when TemplateData is not valid JSON', async () => 
 		Content: {Template: {TemplateName: templateName, TemplateData: 'not json'}},
 	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
 });
+
+test('can send template email with inline TemplateContent (no stored template)', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['inline@example.com']},
+		Content: {
+			Template: {
+				TemplateContent: {
+					Subject: 'Hi {{name}}',
+					Html: '<p>Hi {{name}}</p>',
+					Text: 'Hi {{name}}',
+				},
+				TemplateData: JSON.stringify({name: 'Ada'}),
+			},
+		},
+	}));
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toMatchObject([
+		{
+			subject: 'Hi Ada',
+			body: {html: '<p>Hi Ada</p>', text: 'Hi Ada'},
+			destination: {to: ['inline@example.com']},
+			from: 'sender@example.com',
+		},
+	]);
+});
+
+test('can send template email by TemplateArn', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'arn-template';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Order {{orderNumber}}', Text: 'Order {{orderNumber}}'},
+	}));
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['arn@example.com']},
+		Content: {
+			Template: {
+				TemplateArn: `arn:aws:ses:us-east-1:123456789012:template/${templateName}`,
+				TemplateData: JSON.stringify({orderNumber: '42'}),
+			},
+		},
+	}));
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toMatchObject([
+		{
+			subject: 'Order 42',
+			body: {text: 'Order 42'},
+			destination: {to: ['arn@example.com']},
+		},
+	]);
+});
+
+test('adds custom Headers from the Template content to the stored email', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['headers@example.com']},
+		Content: {
+			Template: {
+				TemplateContent: {Subject: 'Hi', Text: 'Hi'},
+				TemplateData: '{}',
+				Headers: [
+					{Name: 'X-Custom-Header', Value: 'custom-value'},
+					{Name: 'X-Campaign', Value: 'summer-sale'},
+				],
+			},
+		},
+	}));
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toMatchObject([
+		{
+			subject: 'Hi',
+			headers: [
+				{name: 'X-Custom-Header', value: 'custom-value'},
+				{name: 'X-Campaign', value: 'summer-sale'},
+			],
+		},
+	]);
+});
+
+test('rejects a template send with no name, ARN, or inline content', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['user@example.com']},
+		Content: {Template: {TemplateData: '{}'}},
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+});

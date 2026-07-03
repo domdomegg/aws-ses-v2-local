@@ -22,6 +22,7 @@ export type Email = {
 		text?: string | undefined;
 	};
 	attachments: {content: string; contentType: string; filename?: string | undefined; size: number}[];
+	headers?: {name: string; value: string}[] | undefined;
 	at: number;
 };
 
