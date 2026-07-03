@@ -57,3 +57,33 @@ test('rejects a render when TemplateData is not valid JSON', async () => {
 		TemplateData: 'not json',
 	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
 });
+
+test('fails the render when data is missing template attributes (SES parity)', async () => {
+	const ses = client();
+	const templateName = 'render-template-missing-attr';
+
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Hi {{name}}'},
+	}));
+
+	await expect(ses.send(new TestRenderEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateData: JSON.stringify({}),
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+});
+
+test('rejects a render without TemplateData (required in the real API)', async () => {
+	const ses = client();
+	const templateName = 'render-template-no-data';
+
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi', Text: 'Hi'},
+	}));
+
+	await expect(ses.send(new TestRenderEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateData: undefined,
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+});

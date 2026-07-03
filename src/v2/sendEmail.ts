@@ -1,11 +1,11 @@
 import type {RequestHandler} from 'express';
 import {type AddressObject, simpleParser} from 'mailparser';
-import {getTemplate, hasTemplate, saveEmail} from '../store';
+import {saveEmail} from '../store';
 import {z} from 'zod';
-import {charsetDataSchema, emailAddressListSchema} from '../validation';
+import {charsetDataSchema, emailAddressListSchema, messageHeadersSchema} from '../validation';
 import {getCurrentTimestamp, getMessageId} from '../util';
 import {
-	compileTemplateParts, parseTemplateData, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateParts,
+	compileTemplateParts, parseTemplateData, resolveTemplateParts, strictTemplateRenderingEnabled, TemplateRenderError,
 } from './renderTemplate';
 
 const attachmentSchema = z.object({
@@ -39,13 +39,11 @@ const sendEmailSchema = z.object({
 			}),
 			Subject: charsetDataSchema,
 			Attachments: z.array(attachmentSchema).optional(),
+			Headers: messageHeadersSchema,
 		}).optional(),
 		Template: z.object({
 			Attachments: z.array(attachmentSchema).optional(),
-			Headers: z.array(z.object({
-				Name: z.string(),
-				Value: z.string(),
-			})).optional(),
+			Headers: messageHeadersSchema,
 			TemplateArn: z.string().optional(),
 			TemplateContent: z.object({
 				Subject: z.string().optional(),
@@ -140,6 +138,7 @@ const handleSimple: RequestHandler = async (req, res) => {
 			text: data.Content.Simple.Body.Text?.Data,
 		},
 		attachments,
+		headers: data.Content.Simple.Headers?.map((h) => ({name: h.Name, value: h.Value})),
 		at: getCurrentTimestamp(),
 	});
 
@@ -183,13 +182,6 @@ const handleRaw: RequestHandler = async (req, res) => {
 	res.status(200).send({MessageId: messageId});
 };
 
-// arn:aws:ses:<region>:<account>:template/<name>
-const templateNameFromArn = (arn: string): string | undefined => {
-	const marker = ':template/';
-	const idx = arn.indexOf(marker);
-	return idx === -1 ? undefined : arn.slice(idx + marker.length);
-};
-
 const handleTemplate: RequestHandler = (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
 	if (!data.Content?.Template) {
@@ -206,23 +198,20 @@ const handleTemplate: RequestHandler = (req, res) => {
 		TemplateName, TemplateArn, TemplateContent, TemplateData, Headers,
 	} = data.Content.Template;
 
-	// Resolve template parts from a stored template (by name or ARN) or inline content.
-	let templateParts: TemplateParts;
-	const storedName = TemplateName ?? (TemplateArn ? templateNameFromArn(TemplateArn) : undefined);
-	if (storedName) {
-		const template = getTemplate(storedName);
-		if (!hasTemplate(storedName) || !template?.TemplateName || !template?.TemplateContent) {
+	const resolved = resolveTemplateParts({TemplateName, TemplateArn, TemplateContent});
+	if ('error' in resolved) {
+		if (resolved.error === 'not-found') {
 			res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
-			return;
+		} else if (resolved.error === 'invalid-arn') {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid template ARN.'});
+		} else {
+			res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.'});
 		}
 
-		templateParts = template.TemplateContent;
-	} else if (TemplateContent) {
-		templateParts = TemplateContent;
-	} else {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.'});
 		return;
 	}
+
+	const templateParts = resolved.parts;
 
 	const templateData = parseTemplateData(TemplateData);
 	if (templateData instanceof Error) {

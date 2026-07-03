@@ -762,3 +762,51 @@ test('rejects a template send with no name, ARN, or inline content', async () =>
 		Content: {Template: {TemplateData: '{}'}},
 	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
 });
+
+test('rejects a send with an invalid TemplateArn', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['user@example.com']},
+		Content: {
+			Template: {
+				TemplateArn: 'arn:aws:ses:us-east-1:123456789012:foo/bar',
+				TemplateContent: {Subject: 'Hi', Text: 'Hi'},
+				TemplateData: '{}',
+			},
+		},
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+});
+
+test('adds custom Headers on Simple content to the stored email', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	await ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['simple-headers@example.com']},
+		Content: {
+			Simple: {
+				Subject: {Data: 'Hi'},
+				Body: {Text: {Data: 'Hi'}},
+				Headers: [{Name: 'X-Custom-Header', Value: 'custom-value'}],
+			},
+		},
+	}));
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toMatchObject([
+		{
+			subject: 'Hi',
+			headers: [{name: 'X-Custom-Header', value: 'custom-value'}],
+		},
+	]);
+});

@@ -517,3 +517,76 @@ test('marks a recipient FAILED when its ReplacementTemplateData is invalid JSON'
 	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('FAILED');
 	expect(response.BulkEmailEntryResults?.[1]?.Error).toBeTruthy();
 });
+
+test('can send bulk email by TemplateArn', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-arn-template';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Order {{orderNumber}}', Text: 'Order {{orderNumber}}'},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {
+			Template: {
+				TemplateArn: `arn:aws:ses:us-east-1:123456789012:template/${templateName}`,
+				TemplateData: JSON.stringify({orderNumber: '42'}),
+			},
+		},
+		BulkEmailEntries: [{Destination: {ToAddresses: ['bulk-arn@example.com']}}],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toMatchObject([
+		{
+			subject: 'Order 42',
+			destination: {to: ['bulk-arn@example.com']},
+		},
+	]);
+});
+
+test('applies Template Headers to every bulk email', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-headers-template';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Hi {{name}}'},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({name: 'Default'}),
+				Headers: [{Name: 'X-Campaign', Value: 'summer-sale'}],
+			},
+		},
+		BulkEmailEntries: [
+			{Destination: {ToAddresses: ['bulk-headers-1@example.com']}},
+			{Destination: {ToAddresses: ['bulk-headers-2@example.com']}},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toHaveLength(2);
+	for (const email of s.emails) {
+		expect(email.headers).toEqual([{name: 'X-Campaign', value: 'summer-sale'}]);
+	}
+});

@@ -1,4 +1,5 @@
 import Handlebars from 'handlebars';
+import {getTemplate} from '../store';
 
 // Values may be strings, numbers, nested objects, or arrays (the latter for {{#each}} and dotted paths).
 export type TemplateData = Record<string, unknown>;
@@ -70,6 +71,50 @@ export const compileTemplateParts = (parts: TemplateParts, options: RenderOption
 		html: renderHtml(data),
 		text: renderText(data),
 	});
+};
+
+// The SES `Template` request shape common to SendEmail and SendBulkEmail.
+export type TemplateSource = {
+	TemplateName?: string | undefined;
+	TemplateArn?: string | undefined;
+	TemplateContent?: TemplateParts | undefined;
+};
+
+// arn:aws:ses:<region>:<account>:template/<name>
+const templateNameFromArn = (arn: string): string | undefined => {
+	const marker = ':template/';
+	const idx = arn.indexOf(marker);
+	return idx === -1 ? undefined : arn.slice(idx + marker.length);
+};
+
+/**
+ * Resolve the SES `Template` request shape to renderable parts: a stored template
+ * (by TemplateName, or by the name inside TemplateArn) or inline TemplateContent.
+ * Shared by the send paths so the two endpoints cannot drift.
+ */
+export const resolveTemplateParts = (source: TemplateSource): {parts: TemplateParts} | {error: 'invalid-arn' | 'no-source'} | {error: 'not-found'; name: string} => {
+	let storedName = source.TemplateName;
+	if (!storedName && source.TemplateArn) {
+		storedName = templateNameFromArn(source.TemplateArn);
+		if (!storedName) {
+			return {error: 'invalid-arn'};
+		}
+	}
+
+	if (storedName) {
+		const template = getTemplate(storedName);
+		if (!template) {
+			return {error: 'not-found', name: storedName};
+		}
+
+		return {parts: template.TemplateContent};
+	}
+
+	if (source.TemplateContent) {
+		return {parts: source.TemplateContent};
+	}
+
+	return {error: 'no-source'};
 };
 
 // Parse a TemplateData/ReplacementTemplateData JSON string; returns {} when empty and an Error (not thrown) for invalid input.

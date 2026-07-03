@@ -179,6 +179,8 @@ By default this mock matches SES's send behaviour: a variable referenced in a te
 
 If you would rather catch template/data mismatches locally, set the `AWS_SES_STRICT_TEMPLATE_RENDERING=true` environment variable. This makes a missing variable fail fast — a `400` for `sendEmail`, and a `FAILED` entry for `sendBulkEmail`. This is a **deliberate divergence from SES**, intended purely as a local debugging aid; leave it unset for parity.
 
+`testRenderEmailTemplate` always fails fast (`400`) on a missing variable, regardless of this setting — real SES reports missing rendering attributes synchronously for this endpoint, since validating templates is its whole purpose.
+
 ### Viewing emails
 
 Navigate to the address and port where the server is running in your browser (e.g. [`localhost:8005`](http://localhost:8005/)).

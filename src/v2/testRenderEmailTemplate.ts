@@ -1,9 +1,15 @@
 import type {RequestHandler} from 'express';
 import MailComposer from 'nodemailer/lib/mail-composer';
-import {hasTemplate, getTemplate} from '../store';
+import {z} from 'zod';
+import {getTemplate} from '../store';
 import {
-	compileTemplateParts, parseTemplateData, strictTemplateRenderingEnabled, TemplateRenderError,
+	compileTemplateParts, parseTemplateData, TemplateRenderError,
 } from './renderTemplate';
+
+// TemplateData is required in the real API (unlike the send paths, where it is optional).
+const testRenderSchema = z.object({
+	TemplateData: z.string(),
+});
 
 // SES returns the complete MIME message for the rendered template.
 const buildMimeMessage = async (subject: string, html: string, text: string): Promise<string> => {
@@ -27,12 +33,18 @@ const handler: RequestHandler = async (req, res) => {
 	}
 
 	const template = getTemplate(templateName);
-	if (!hasTemplate(templateName) || !template?.TemplateContent) {
+	if (!template) {
 		res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
 		return;
 	}
 
-	const templateData = parseTemplateData((req.body as {TemplateData?: string} | undefined)?.TemplateData);
+	const result = testRenderSchema.safeParse(req.body);
+	if (!result.success) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide TemplateData.'});
+		return;
+	}
+
+	const templateData = parseTemplateData(result.data.TemplateData);
 	if (templateData instanceof Error) {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: ${templateData.message}`});
 		return;
@@ -42,7 +54,10 @@ const handler: RequestHandler = async (req, res) => {
 	let html: string;
 	let text: string;
 	try {
-		({subject, html, text} = compileTemplateParts(template.TemplateContent, {strict: strictTemplateRenderingEnabled()})(templateData));
+		// Always strict: unlike the send paths (where real SES reports rendering failures
+		// asynchronously), real SES fails this synchronous API with a 400 when the data is
+		// missing attributes referenced by the template (MissingRenderingAttribute).
+		({subject, html, text} = compileTemplateParts(template.TemplateContent, {strict: true})(templateData));
 	} catch (error: unknown) {
 		if (!(error instanceof TemplateRenderError)) {
 			throw error;

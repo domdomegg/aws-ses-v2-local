@@ -73,5 +73,6 @@ export const convertToMailOptions = (email: Email): MailOptions => ({
 	html: email.body.html,
 	text: email.body.text,
 	attachments: email.attachments,
+	headers: email.headers?.map((h) => ({key: h.name, value: h.value})),
 	date: new Date(email.at * 1000),
 });

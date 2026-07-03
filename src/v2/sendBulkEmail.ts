@@ -1,12 +1,11 @@
 import type {RequestHandler} from 'express';
-import {
-	type Email, getTemplate, hasTemplate, saveEmail,
-} from '../store';
+import {type Email, saveEmail} from '../store';
 import isEmailValid from '../isEmailValid';
 import {z} from 'zod';
 import {getCurrentTimestamp} from '../util';
+import {messageHeadersSchema} from '../validation';
 import {
-	compileTemplateParts, parseTemplateData, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateData,
+	compileTemplateParts, parseTemplateData, resolveTemplateParts, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateData,
 } from './renderTemplate';
 
 type BulkEmailResult = {
@@ -37,6 +36,7 @@ const sendBulkEmailSchema = z.object({
 	ConfigurationSetName: z.string().optional(),
 	DefaultContent: z.object({
 		Template: z.object({
+			Headers: messageHeadersSchema,
 			TemplateArn: z.string().optional(),
 			TemplateData: z.string().optional(),
 			TemplateName: z.string().optional(),
@@ -73,30 +73,21 @@ const handler: RequestHandler = (req, res, next) => {
 	const replyToAddresses = result.data.ReplyToAddresses ?? [];
 	const defaultContent = result.data.DefaultContent;
 
-	// Try to retrieve the template.
-	const templateName = defaultContent.Template.TemplateName;
-	let templateSubject = '';
-	let templateHtml = '';
-	let templateText = '';
-
-	if (templateName) {
-		if (!hasTemplate(templateName)) {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Unable to find the template: ${templateName}.`});
-			return;
+	// Resolve the template (by name, ARN, or inline content) — shared with SendEmail.
+	const resolved = resolveTemplateParts(defaultContent.Template);
+	if ('error' in resolved) {
+		if (resolved.error === 'not-found') {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Unable to find the template: ${resolved.name}.`});
+		} else if (resolved.error === 'invalid-arn') {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid template ARN.'});
+		} else {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide either a template name or template content.'});
 		}
 
-		const template = getTemplate(templateName);
-		templateSubject = template?.TemplateContent.Subject ?? '';
-		templateHtml = template?.TemplateContent.Html ?? '';
-		templateText = template?.TemplateContent.Text ?? '';
-	} else if (defaultContent.Template.TemplateContent) {
-		templateSubject = defaultContent.Template.TemplateContent?.Subject ?? '';
-		templateHtml = defaultContent.Template.TemplateContent.Html ?? '';
-		templateText = defaultContent.Template.TemplateContent.Text ?? '';
-	} else {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide either a template name or template content.'});
 		return;
 	}
+
+	const {Subject: templateSubject = '', Html: templateHtml = '', Text: templateText = ''} = resolved.parts;
 
 	if (!templateSubject || (!templateHtml && !templateText)) {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a subject and either an HTML or text body in the template.'});
@@ -186,6 +177,7 @@ const handler: RequestHandler = (req, res, next) => {
 				text,
 			},
 			attachments: [],
+			headers: defaultContent.Template.Headers?.map((h) => ({name: h.Name, value: h.Value})),
 			at: getCurrentTimestamp(),
 		};
 
