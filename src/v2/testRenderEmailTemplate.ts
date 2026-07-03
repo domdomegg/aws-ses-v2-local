@@ -1,10 +1,10 @@
 import type {RequestHandler} from 'express';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import {z} from 'zod';
-import {getTemplate} from '../store';
 import {
 	compileTemplateParts, parseTemplateData, TemplateRenderError,
 } from './renderTemplate';
+import {requireTemplate} from './templateRequest';
 
 // TemplateData is required in the real API (unlike the send paths, where it is optional).
 const testRenderSchema = z.object({
@@ -23,18 +23,8 @@ const buildMimeMessage = async (subject: string, html: string, text: string): Pr
 };
 
 const handler: RequestHandler = async (req, res) => {
-	// Express 5 types params as string | string[]; this route has one segment.
-	const {TemplateName} = req.params;
-	const templateName = Array.isArray(TemplateName) ? TemplateName[0] : TemplateName;
-
-	if (!templateName) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a template name.'});
-		return;
-	}
-
-	const template = getTemplate(templateName);
+	const template = requireTemplate(req, res);
 	if (!template) {
-		res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
 		return;
 	}
 
