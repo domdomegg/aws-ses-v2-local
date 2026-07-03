@@ -15,10 +15,15 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 - SES V1 SendEmail endpoint
 - SES V1 SendRawEmail endpoint
 - SES V2 SendEmail endpoint (both Simple, Raw and Template)
+- SES V2 sendBulkEmail endpoint
 - SES V2 createEmailTemplate endpoint
+- SES V2 getEmailTemplate endpoint
+- SES V2 listEmailTemplates endpoint
+- SES V2 updateEmailTemplate endpoint
 - SES V2 deleteEmailTemplate endpoint
+- SES V2 testRenderEmailTemplate endpoint (returns the rendered MIME message)
 - SES V2 getAccount endpoint (returns the content of the AWS_SES_ACCOUNT env variable)
-- SES V2 sendBulkEmail endpoint (only supports simple placeholder replacement)
+- Handlebars email templates (variables, `{{#each}}`, `{{#if}}`, dotted paths, and other built-in helpers), matching AWS SES's rendering — see [Email templates](#email-templates)
 - Realistic API responses, compatible with the AWS SDK (in JavaScript/TypeScript/Node.js, Java, Python, Go, C++, .NET, PHP, Ruby) and the AWS CLI
 - To, Cc, Bcc, ReplyTo and From addresses
 - Plain text and HTML emails
@@ -161,6 +166,20 @@ await transporter.sendMail({
 </details>
 
 Using another language or version? Submit a PR to update this list :)
+
+### Email templates
+
+Templates created with `createEmailTemplate` are rendered with [Handlebars](https://handlebarsjs.com/), the same engine AWS SES uses. This supports variables (`{{name}}`), dotted paths (`{{user.name}}`), `{{#each}}`, `{{#if}}`/`{{#unless}}`, and the other built-in helpers. As on real SES, values are **not** HTML-escaped — escape untrusted input yourself before putting it in the template data.
+
+`sendBulkEmail` follows SES's whole-object fallback: `DefaultContent.TemplateData` is used for an entry only when that entry's `ReplacementTemplateData` is empty (`{}`) or absent. Once an entry supplies any replacement data, it is used on its own — the defaults are not merged in per key.
+
+#### Missing template variables
+
+By default this mock matches SES's send behaviour: a variable referenced in a template but missing from the data renders as an empty string, and the send still succeeds (real SES accepts the request, returns a MessageId, and reports rendering failures asynchronously rather than as a synchronous API error).
+
+If you would rather catch template/data mismatches locally, set the `AWS_SES_STRICT_TEMPLATE_RENDERING=true` environment variable. This makes a missing variable fail fast — a `400` for `sendEmail`, and a `FAILED` entry for `sendBulkEmail`. This is a **deliberate divergence from SES**, intended purely as a local debugging aid; leave it unset for parity.
+
+`testRenderEmailTemplate` always fails fast (`400`) on a missing variable, regardless of this setting — real SES reports missing rendering attributes synchronously for this endpoint, since validating templates is its whole purpose.
 
 ### Viewing emails
 

@@ -1,9 +1,12 @@
 import type {RequestHandler} from 'express';
 import {type AddressObject, simpleParser} from 'mailparser';
-import {getTemplate, hasTemplate, saveEmail} from '../store';
+import {saveEmail} from '../store';
 import {z} from 'zod';
-import {charsetDataSchema, emailAddressListSchema} from '../validation';
+import {charsetDataSchema, emailAddressListSchema, messageHeadersSchema} from '../validation';
 import {getCurrentTimestamp, getMessageId} from '../util';
+import {
+	compileTemplateParts, parseTemplateData, resolveTemplateParts, strictTemplateRenderingEnabled, TemplateRenderError,
+} from './renderTemplate';
 
 const attachmentSchema = z.object({
 	FileName: z.string(),
@@ -36,28 +39,18 @@ const sendEmailSchema = z.object({
 			}),
 			Subject: charsetDataSchema,
 			Attachments: z.array(attachmentSchema).optional(),
+			Headers: messageHeadersSchema,
 		}).optional(),
 		Template: z.object({
 			Attachments: z.array(attachmentSchema).optional(),
-			// Headers
-			// TemplateArn
-			// TemplateContent
-			TemplateData: z.string().optional().transform((TemplateData) => {
-				if (!TemplateData) {
-					return;
-				}
-
-				const templateDataMap = new Map<string, string>();
-				for (const [key, value] of Object.entries(JSON.parse(TemplateData))) {
-					if (typeof value !== 'string') {
-						throw new Error(`aws-ses-v2-local: TemplateData value for key "${key}" must be a string.`);
-					}
-
-					templateDataMap.set(key, value);
-				}
-
-				return templateDataMap;
-			}),
+			Headers: messageHeadersSchema,
+			TemplateArn: z.string().optional(),
+			TemplateContent: z.object({
+				Subject: z.string().optional(),
+				Html: z.string().optional(),
+				Text: z.string().optional(),
+			}).optional(),
+			TemplateData: z.string().optional(),
 			TemplateName: z.string().optional(),
 		}).optional(),
 	}),
@@ -93,19 +86,6 @@ const handler: RequestHandler = (req, res, next) => {
 	} else {
 		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have either Simple or Raw content. Want to add support for other types of emails? Open a PR!'});
 	}
-};
-
-const expandDataIntoTemplate = (template: string, data?: Map<string, string>): string => {
-	return data
-		? template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-			const value = data.get(key);
-			if (value === undefined) {
-				throw new Error(`Template data missing for key: ${key}`);
-			}
-
-			return value;
-		})
-		: template;
 };
 
 const transformAttachments = (attachments?: Attachment[]) => {
@@ -158,6 +138,7 @@ const handleSimple: RequestHandler = async (req, res) => {
 			text: data.Content.Simple.Body.Text?.Data,
 		},
 		attachments,
+		headers: data.Content.Simple.Headers?.map((h) => ({name: h.Name, value: h.Value})),
 		at: getCurrentTimestamp(),
 	});
 
@@ -204,14 +185,7 @@ const handleRaw: RequestHandler = async (req, res) => {
 const handleTemplate: RequestHandler = (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
 	if (!data.Content?.Template) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have data.'});
-		return;
-	}
-
-	const {TemplateName, TemplateData} = data.Content.Template;
-
-	if (!TemplateName) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name.'});
+		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have data.'});
 		return;
 	}
 
@@ -220,17 +194,50 @@ const handleTemplate: RequestHandler = (req, res) => {
 		return;
 	}
 
-	const template = getTemplate(TemplateName);
-	if (!hasTemplate(TemplateName) || !template?.TemplateName || !template?.TemplateContent) {
-		res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+	const {
+		TemplateName, TemplateArn, TemplateContent, TemplateData, Headers,
+	} = data.Content.Template;
+
+	const resolved = resolveTemplateParts({TemplateName, TemplateArn, TemplateContent});
+	if ('error' in resolved) {
+		if (resolved.error === 'not-found') {
+			res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+		} else if (resolved.error === 'invalid-arn') {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid template ARN.'});
+		} else {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.'});
+		}
+
 		return;
 	}
 
-	const messageId = getMessageId();
+	const templateParts = resolved.parts;
+	if (!templateParts.Subject || (!templateParts.Html && !templateParts.Text)) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a subject and either an HTML or text body in the template.'});
+		return;
+	}
 
-	const subject = expandDataIntoTemplate(template.TemplateContent.Subject ?? '', TemplateData) ?? '';
-	const htmlBody = expandDataIntoTemplate(template.TemplateContent.Html ?? '', TemplateData) ?? '';
-	const textBody = expandDataIntoTemplate(template.TemplateContent.Text ?? '', TemplateData) ?? '';
+	const templateData = parseTemplateData(TemplateData);
+	if (templateData instanceof Error) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: ${templateData.message}`});
+		return;
+	}
+
+	let subject: string;
+	let htmlBody: string;
+	let textBody: string;
+	try {
+		({subject, html: htmlBody, text: textBody} = compileTemplateParts(templateParts, {strict: strictTemplateRenderingEnabled()})(templateData));
+	} catch (error: unknown) {
+		if (error instanceof TemplateRenderError) {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
+			return;
+		}
+
+		throw error;
+	}
+
+	const messageId = getMessageId();
 
 	const attachments = transformAttachments(data.Content.Template.Attachments);
 
@@ -249,6 +256,7 @@ const handleTemplate: RequestHandler = (req, res) => {
 			text: textBody,
 		},
 		attachments,
+		headers: Headers?.map((h) => ({name: h.Name, value: h.Value})),
 		at: getCurrentTimestamp(),
 	});
 

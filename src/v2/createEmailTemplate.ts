@@ -1,7 +1,6 @@
 import type {RequestHandler} from 'express';
-import {
-	hasTemplate, setTemplate, templateSchema,
-} from '../store';
+import {hasTemplate, setTemplate, templateSchema} from '../store';
+import {compileTemplateOrReject} from './templateRequest';
 
 const handler: RequestHandler = (req, res) => {
 	const result = templateSchema.safeParse({...req.body, CreatedTimestamp: Date.now() / 1000});
@@ -13,6 +12,12 @@ const handler: RequestHandler = (req, res) => {
 	// Check if the template already exists.
 	if (hasTemplate(result.data.TemplateName)) {
 		res.status(400).send({type: 'AlreadyExistsException', message: 'The resource specified in your request already exists.'});
+		return;
+	}
+
+	// Reject malformed Handlebars up front, as real SES does at create time (rather than
+	// hard-failing every later send). Compilation catches only syntax errors, not missing variables.
+	if (!compileTemplateOrReject(result.data.TemplateContent, res)) {
 		return;
 	}
 

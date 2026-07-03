@@ -22,6 +22,7 @@ export type Email = {
 		text?: string | undefined;
 	};
 	attachments: {content: string; contentType: string; filename?: string | undefined; size: number}[];
+	headers?: {name: string; value: string}[] | undefined;
 	at: number;
 };
 
@@ -72,5 +73,6 @@ export const convertToMailOptions = (email: Email): MailOptions => ({
 	html: email.body.html,
 	text: email.body.text,
 	attachments: email.attachments,
+	headers: email.headers?.map((h) => ({key: h.name, value: h.value})),
 	date: new Date(email.at * 1000),
 });

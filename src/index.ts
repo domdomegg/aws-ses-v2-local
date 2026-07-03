@@ -5,6 +5,8 @@ import v1SendRawEmail from './v1/sendRawEmail';
 import v1SendEmail from './v1/sendEmail';
 import v2CreateEmailTemplate from './v2/createEmailTemplate';
 import v2GetEmailTemplate from './v2/getEmailTemplate';
+import v2UpdateEmailTemplate from './v2/updateEmailTemplate';
+import v2TestRenderEmailTemplate from './v2/testRenderEmailTemplate';
 import v2DeleteEmailTemplate from './v2/deleteEmailTemplate';
 import v2GetAccount from './v2/getAccount';
 import v2ListEmailTemplates from './v2/listEmailTemplates';
@@ -123,7 +125,9 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 		v2ListEmailTemplates(req, res, next);
 	});
 	app.post('/v2/email/templates', v2CreateEmailTemplate);
+	app.post('/v2/email/templates/:TemplateName/render', v2TestRenderEmailTemplate);
 	app.get('/v2/email/templates/:TemplateName', v2GetEmailTemplate);
+	app.put('/v2/email/templates/:TemplateName', v2UpdateEmailTemplate);
 	app.delete('/v2/email/templates/:TemplateName', v2DeleteEmailTemplate);
 
 	// SES V2 - account handling.

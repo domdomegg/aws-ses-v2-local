@@ -1,23 +1,14 @@
 import type {RequestHandler} from 'express';
-import {hasTemplate, deleteTemplate} from '../store';
+import {deleteTemplate} from '../store';
+import {requireTemplate} from './templateRequest';
 
 const handler: RequestHandler = (req, res) => {
-	// Express 5 types params as string | string[]; this route has one segment.
-	const {TemplateName} = req.params;
-	const templateName = Array.isArray(TemplateName) ? TemplateName[0] : TemplateName;
-
-	if (!templateName) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a template name.'});
+	const template = requireTemplate(req, res);
+	if (!template) {
 		return;
 	}
 
-	// Check if the template already exists.
-	if (!hasTemplate(templateName)) {
-		res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
-		return;
-	}
-
-	deleteTemplate(templateName);
+	deleteTemplate(template.TemplateName);
 	res.status(200).send();
 };
 

@@ -1,15 +1,12 @@
 import type {RequestHandler} from 'express';
-import {
-	type Email, getTemplate, hasTemplate, saveEmail,
-} from '../store';
+import {type Email, saveEmail} from '../store';
 import isEmailValid from '../isEmailValid';
 import {z} from 'zod';
 import {getCurrentTimestamp} from '../util';
-
-type Replacement = {
-	Name: string;
-	Value: string;
-};
+import {messageHeadersSchema} from '../validation';
+import {
+	compileTemplateParts, parseTemplateData, resolveTemplateParts, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateData,
+} from './renderTemplate';
 
 type BulkEmailResult = {
 	MessageId: string;
@@ -34,11 +31,13 @@ const sendBulkEmailSchema = z.object({
 				ReplacementTemplateData: z.string(),
 			}),
 		}).optional(),
+		ReplacementHeaders: messageHeadersSchema,
 		ReplacementTags: z.array(replacementSchema).optional(),
 	})),
 	ConfigurationSetName: z.string().optional(),
 	DefaultContent: z.object({
 		Template: z.object({
+			Headers: messageHeadersSchema,
 			TemplateArn: z.string().optional(),
 			TemplateData: z.string().optional(),
 			TemplateName: z.string().optional(),
@@ -75,42 +74,48 @@ const handler: RequestHandler = (req, res, next) => {
 	const replyToAddresses = result.data.ReplyToAddresses ?? [];
 	const defaultContent = result.data.DefaultContent;
 
-	// Try to retrieve the template.
-	const templateName = defaultContent.Template.TemplateName;
-	let templateSubject = '';
-	let templateHtml = '';
-	let templateText = '';
-
-	if (templateName) {
-		if (!hasTemplate(templateName)) {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Unable to find the template: ${templateName}.`});
-			return;
+	// Resolve the template (by name, ARN, or inline content) — shared with SendEmail.
+	const resolved = resolveTemplateParts(defaultContent.Template);
+	if ('error' in resolved) {
+		if (resolved.error === 'not-found') {
+			res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+		} else if (resolved.error === 'invalid-arn') {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid template ARN.'});
+		} else {
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide either a template name or template content.'});
 		}
 
-		const template = getTemplate(templateName);
-		templateSubject = template?.TemplateContent.Subject ?? '';
-		templateHtml = template?.TemplateContent.Html ?? '';
-		templateText = template?.TemplateContent.Text ?? '';
-	} else if (defaultContent.Template.TemplateContent) {
-		templateSubject = defaultContent.Template.TemplateContent?.Subject ?? '';
-		templateHtml = defaultContent.Template.TemplateContent.Html ?? '';
-		templateText = defaultContent.Template.TemplateContent.Text ?? '';
-	} else {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide either a template name or template content.'});
 		return;
 	}
+
+	const {Subject: templateSubject = '', Html: templateHtml = '', Text: templateText = ''} = resolved.parts;
 
 	if (!templateSubject || (!templateHtml && !templateText)) {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a subject and either an HTML or text body in the template.'});
 		return;
 	}
 
-	// Default template replacement data.
-	const defaultTemplateData = decodeTemplateData(defaultContent.Template?.TemplateData);
+	const defaultTemplateData = parseTemplateData(defaultContent.Template.TemplateData);
 	if (defaultTemplateData instanceof Error) {
-		res.status(400).send(defaultTemplateData);
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: ${defaultTemplateData.message}`});
 		return;
 	}
+
+	// Compile once; reused for every recipient.
+	const strict = strictTemplateRenderingEnabled();
+	let renderParts: (d: TemplateData) => {subject: string; html: string; text: string};
+	try {
+		renderParts = compileTemplateParts({Subject: templateSubject, Html: templateHtml, Text: templateText}, {strict});
+	} catch (error: unknown) {
+		if (!(error instanceof TemplateRenderError)) {
+			throw error;
+		}
+
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
+		return;
+	}
+
+	const defaultHeaders = defaultContent.Template.Headers ?? [];
 
 	const results: BulkEmailResult[] = [];
 	// Process each destination.
@@ -128,15 +133,43 @@ const handler: RequestHandler = (req, res, next) => {
 			return;
 		}
 
-		const templateData = decodeTemplateData(entry.ReplacementEmailContent?.ReplacementTemplate?.ReplacementTemplateData);
-		if (templateData instanceof Error) {
-			res.status(400).send(templateData);
+		const replacementData = parseTemplateData(entry.ReplacementEmailContent?.ReplacementTemplate?.ReplacementTemplateData, 'ReplacementTemplateData');
+		if (replacementData instanceof Error) {
+			results.push({
+				MessageId: messageId,
+				Error: replacementData.message,
+				Status: 'FAILED',
+			});
 			return;
 		}
 
-		const subject = replaceTemplateData(templateSubject, templateData, defaultTemplateData);
-		const html = replaceTemplateData(templateHtml, templateData, defaultTemplateData);
-		const text = replaceTemplateData(templateText, templateData, defaultTemplateData);
+		// Whole-object fallback (SES semantics): defaults apply only when the entry supplies no
+		// replacement data ({} or absent); any replacement data is used on its own, not merged per-key.
+		const templateData: TemplateData = Object.keys(replacementData).length > 0 ? replacementData : defaultTemplateData;
+
+		let subject: string;
+		let html: string;
+		let text: string;
+		try {
+			({subject, html, text} = renderParts(templateData));
+		} catch (error: unknown) {
+			if (!(error instanceof TemplateRenderError)) {
+				throw error; // surface unexpected errors instead of masking them as a per-recipient FAILED
+			}
+
+			results.push({
+				MessageId: messageId,
+				Error: `template rendering failed - ${error.message}`,
+				Status: 'FAILED',
+			});
+			return;
+		}
+
+		// Per-name merge (SES semantics): an entry's ReplacementHeaders take precedence over
+		// same-named Template headers; unreplaced Template headers still apply.
+		const replacementHeaders = entry.ReplacementHeaders ?? [];
+		const replacedNames = new Set(replacementHeaders.map((h) => h.Name));
+		const headers = [...defaultHeaders.filter((h) => !replacedNames.has(h.Name)), ...replacementHeaders];
 
 		const email: Email = {
 			messageId,
@@ -153,6 +186,7 @@ const handler: RequestHandler = (req, res, next) => {
 				text,
 			},
 			attachments: [],
+			headers: headers.length > 0 ? headers.map((h) => ({name: h.Name, value: h.Value})) : undefined,
 			at: getCurrentTimestamp(),
 		};
 
@@ -166,53 +200,5 @@ const handler: RequestHandler = (req, res, next) => {
 
 	res.status(200).send({BulkEmailEntryResults: results});
 };
-
-/**
- * Decode template data.
- *
- * Template data is passed in as a JSON string that contains key-value pairs. The keys correspond to the variables in the template and values represent the content that replaces the variables in the email. https://docs.aws.amazon.com/ses/latest/dg/send-personalized-email-api.html  https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_Template.html
- * eg. '{"name":"John Doe"}' as templateData with template 'Hello {{name}}' would result in 'Hello John Doe'
- */
-const decodeTemplateData = (templateData = '{}'): Replacement[] | Error => {
-	try {
-		const parsed = JSON.parse(templateData);
-		const errors: string[] = [];
-		const replacements: Replacement[] = [];
-
-		Object.entries(parsed).forEach(([key, value]) => {
-			if (typeof value !== 'string') {
-				errors.push(`Invalid replacement data found in key "${key}": expected string, got ${typeof value}`);
-				return;
-			}
-
-			replacements.push({
-				Name: key,
-				Value: value,
-			});
-		});
-
-		if (errors.length > 0) {
-			return new Error(`Template validation failed:\n${errors.join('\n')}`);
-		}
-
-		return replacements;
-	} catch (error: unknown) {
-		return new Error(`Failed to parse template data: ${String(error)}`);
-	}
-};
-
-/**
- * Replace template data.
- */
-function replaceTemplateData(content: string, replacements: Replacement[] = [], defaultReplacements: Replacement[] = []): string {
-	let newContent = content;
-	replacements.forEach((item) => {
-		newContent = newContent.replaceAll(`{{${item.Name}}}`, item.Value);
-	});
-	defaultReplacements.forEach((item) => {
-		newContent = newContent.replaceAll(`{{${item.Name}}}`, item.Value);
-	});
-	return newContent;
-}
 
 export default handler;
