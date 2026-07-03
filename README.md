@@ -15,10 +15,14 @@ Are you using serverless-offline? You might be interested in [serverless-offline
 - SES V1 SendEmail endpoint
 - SES V1 SendRawEmail endpoint
 - SES V2 SendEmail endpoint (both Simple, Raw and Template)
-- SES V2 createEmailTemplate endpoint
-- SES V2 deleteEmailTemplate endpoint
-- SES V2 getAccount endpoint (returns the content of the AWS_SES_ACCOUNT env variable)
 - SES V2 sendBulkEmail endpoint
+- SES V2 createEmailTemplate endpoint
+- SES V2 getEmailTemplate endpoint
+- SES V2 listEmailTemplates endpoint
+- SES V2 updateEmailTemplate endpoint
+- SES V2 deleteEmailTemplate endpoint
+- SES V2 testRenderEmailTemplate endpoint (returns the rendered MIME message)
+- SES V2 getAccount endpoint (returns the content of the AWS_SES_ACCOUNT env variable)
 - Handlebars email templates (variables, `{{#each}}`, `{{#if}}`, dotted paths, and other built-in helpers), matching AWS SES's rendering — see [Email templates](#email-templates)
 - Realistic API responses, compatible with the AWS SDK (in JavaScript/TypeScript/Node.js, Java, Python, Go, C++, .NET, PHP, Ruby) and the AWS CLI
 - To, Cc, Bcc, ReplyTo and From addresses
