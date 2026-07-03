@@ -810,3 +810,25 @@ test('adds custom Headers on Simple content to the stored email', async () => {
 		},
 	]);
 });
+
+test('rejects a template send whose resolved content lacks a subject or body', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	// No Subject
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['user@example.com']},
+		Content: {Template: {TemplateContent: {Html: '<p>hi</p>'}, TemplateData: '{}'}},
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+
+	// Subject but no body
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['user@example.com']},
+		Content: {Template: {TemplateContent: {Subject: 'Hi'}, TemplateData: '{}'}},
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+});

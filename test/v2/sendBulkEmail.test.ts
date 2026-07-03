@@ -163,7 +163,7 @@ test('returns error when template not found', async () => {
 				},
 			},
 		],
-	}))).rejects.toThrow();
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 404}});
 });
 
 test('returns error when missing from email address', async () => {
@@ -589,4 +589,57 @@ test('applies Template Headers to every bulk email', async () => {
 	for (const email of s.emails) {
 		expect(email.headers).toEqual([{name: 'X-Campaign', value: 'summer-sale'}]);
 	}
+});
+
+test('merges per-entry ReplacementHeaders over the default Template headers', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-replacement-headers';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'Hi {{name}}'},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({name: 'Default'}),
+				Headers: [
+					{Name: 'X-Campaign', Value: 'default'},
+					{Name: 'X-Base', Value: 'base'},
+				],
+			},
+		},
+		BulkEmailEntries: [
+			{
+				Destination: {ToAddresses: ['override@example.com']},
+				ReplacementHeaders: [{Name: 'X-Campaign', Value: 'overridden'}],
+			},
+			{
+				Destination: {ToAddresses: ['defaults@example.com']},
+			},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+	expect(response.BulkEmailEntryResults?.[1]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	const overridden = s.emails.find((e) => e.destination.to.includes('override@example.com'));
+	const defaults = s.emails.find((e) => e.destination.to.includes('defaults@example.com'));
+	// The entry's header replaces the same-named default; unreplaced defaults still apply.
+	expect(overridden?.headers).toEqual([
+		{name: 'X-Base', value: 'base'},
+		{name: 'X-Campaign', value: 'overridden'},
+	]);
+	expect(defaults?.headers).toEqual([
+		{name: 'X-Campaign', value: 'default'},
+		{name: 'X-Base', value: 'base'},
+	]);
 });

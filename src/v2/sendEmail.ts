@@ -205,13 +205,17 @@ const handleTemplate: RequestHandler = (req, res) => {
 		} else if (resolved.error === 'invalid-arn') {
 			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid template ARN.'});
 		} else {
-			res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.'});
+			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.'});
 		}
 
 		return;
 	}
 
 	const templateParts = resolved.parts;
+	if (!templateParts.Subject || (!templateParts.Html && !templateParts.Text)) {
+		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a subject and either an HTML or text body in the template.'});
+		return;
+	}
 
 	const templateData = parseTemplateData(TemplateData);
 	if (templateData instanceof Error) {

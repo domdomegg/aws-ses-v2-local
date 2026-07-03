@@ -31,6 +31,7 @@ const sendBulkEmailSchema = z.object({
 				ReplacementTemplateData: z.string(),
 			}),
 		}).optional(),
+		ReplacementHeaders: messageHeadersSchema,
 		ReplacementTags: z.array(replacementSchema).optional(),
 	})),
 	ConfigurationSetName: z.string().optional(),
@@ -77,7 +78,7 @@ const handler: RequestHandler = (req, res, next) => {
 	const resolved = resolveTemplateParts(defaultContent.Template);
 	if ('error' in resolved) {
 		if (resolved.error === 'not-found') {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Unable to find the template: ${resolved.name}.`});
+			res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
 		} else if (resolved.error === 'invalid-arn') {
 			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid template ARN.'});
 		} else {
@@ -113,6 +114,8 @@ const handler: RequestHandler = (req, res, next) => {
 		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
 		return;
 	}
+
+	const defaultHeaders = defaultContent.Template.Headers ?? [];
 
 	const results: BulkEmailResult[] = [];
 	// Process each destination.
@@ -162,6 +165,12 @@ const handler: RequestHandler = (req, res, next) => {
 			return;
 		}
 
+		// Per-name merge (SES semantics): an entry's ReplacementHeaders take precedence over
+		// same-named Template headers; unreplaced Template headers still apply.
+		const replacementHeaders = entry.ReplacementHeaders ?? [];
+		const replacedNames = new Set(replacementHeaders.map((h) => h.Name));
+		const headers = [...defaultHeaders.filter((h) => !replacedNames.has(h.Name)), ...replacementHeaders];
+
 		const email: Email = {
 			messageId,
 			from: fromEmailAddress,
@@ -177,7 +186,7 @@ const handler: RequestHandler = (req, res, next) => {
 				text,
 			},
 			attachments: [],
-			headers: defaultContent.Template.Headers?.map((h) => ({name: h.Name, value: h.Value})),
+			headers: headers.length > 0 ? headers.map((h) => ({name: h.Name, value: h.Value})) : undefined,
 			at: getCurrentTimestamp(),
 		};
 
