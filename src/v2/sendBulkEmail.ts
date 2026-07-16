@@ -143,9 +143,11 @@ const handler: RequestHandler = (req, res, next) => {
 			return;
 		}
 
-		// Whole-object fallback (SES semantics): defaults apply only when the entry supplies no
-		// replacement data ({} or absent); any replacement data is used on its own, not merged per-key.
-		const templateData: TemplateData = Object.keys(replacementData).length > 0 ? replacementData : defaultTemplateData;
+		// Per-key merge: keys in replacementData override defaultTemplateData
+		const templateData: TemplateData = {
+			...defaultTemplateData,
+			...replacementData,
+		};
 
 		let subject: string;
 		let html: string;
