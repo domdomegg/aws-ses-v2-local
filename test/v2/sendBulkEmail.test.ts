@@ -485,6 +485,43 @@ test('merges partial replacement data by key with default data (per-key merge)',
 	expect(email).toMatchObject({subject: 'Hi Ann', body: {text: 'Age 25'}});
 });
 
+test('merges nested replacement data recursively, replacing arrays wholesale (SES parity)', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+
+	const templateName = 'bulk-nested-merge';
+	await ses.send(new CreateEmailTemplateCommand({
+		TemplateName: templateName,
+		TemplateContent: {Subject: 'Hi {{name}}', Text: 'f={{d.e.f}} g={{d.e.g}} items=[{{#each items}}{{this}},{{/each}}]'},
+	}));
+
+	const response = await ses.send(new SendBulkEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		DefaultContent: {
+			Template: {
+				TemplateName: templateName,
+				TemplateData: JSON.stringify({name: 'Default', d: {e: {f: 'defF', g: 'defG'}}, items: ['a', 'b']}),
+			},
+		},
+		BulkEmailEntries: [
+			{
+				Destination: {ToAddresses: ['nested@example.com']},
+				ReplacementEmailContent: {ReplacementTemplate: {ReplacementTemplateData: JSON.stringify({name: 'Ann', d: {e: {f: 'repF'}}, items: ['c']})}},
+			},
+		],
+	}));
+
+	expect(response.BulkEmailEntryResults?.[0]?.Status).toBe('SUCCESS');
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	const email = s.emails.find((e) => e.destination.to.includes('nested@example.com'));
+	// Verified against real SES: nested objects merge per key ('g' survives), arrays are replaced (no 'a,b,').
+	expect(email).toMatchObject({subject: 'Hi Ann', body: {text: 'f=repF g=defG items=[c,]'}});
+});
+
 test('marks a recipient FAILED when its ReplacementTemplateData is invalid JSON', async () => {
 	const ses = new SESv2Client({
 		endpoint: baseURL,
