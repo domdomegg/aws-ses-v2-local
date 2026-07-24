@@ -5,7 +5,7 @@ import {z} from 'zod';
 import {getCurrentTimestamp} from '../util';
 import {messageHeadersSchema} from '../validation';
 import {
-	compileTemplateParts, parseTemplateData, resolveTemplateParts, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateData,
+	compileTemplateParts, mergeTemplateData, parseTemplateData, resolveTemplateParts, strictTemplateRenderingEnabled, TemplateRenderError, type TemplateData,
 } from './renderTemplate';
 
 type BulkEmailResult = {
@@ -143,9 +143,9 @@ const handler: RequestHandler = (req, res, next) => {
 			return;
 		}
 
-		// Whole-object fallback (SES semantics): defaults apply only when the entry supplies no
-		// replacement data ({} or absent); any replacement data is used on its own, not merged per-key.
-		const templateData: TemplateData = Object.keys(replacementData).length > 0 ? replacementData : defaultTemplateData;
+		// Per-key merge (SES semantics): replacement keys override the defaults, recursively
+		// through nested objects; keys the entry doesn't supply fall back to the default data.
+		const templateData: TemplateData = mergeTemplateData(defaultTemplateData, replacementData);
 
 		let subject: string;
 		let html: string;

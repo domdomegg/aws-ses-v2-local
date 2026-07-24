@@ -136,3 +136,21 @@ export const parseTemplateData = (templateData: string | undefined, fieldName = 
 
 	return parsed as TemplateData;
 };
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Merge an entry's ReplacementTemplateData over DefaultContent.TemplateData the way SES does
+ * (verified against the real API): keys merge recursively through nested objects, while arrays
+ * and scalar values from the replacement win wholesale. Keys the replacement doesn't supply
+ * keep their default values, so `{}` (or absent) replacement data uses the defaults unchanged.
+ */
+export const mergeTemplateData = (defaults: TemplateData, replacement: TemplateData): TemplateData => {
+	const merged: TemplateData = {...defaults};
+	for (const [key, value] of Object.entries(replacement)) {
+		const existing = merged[key];
+		merged[key] = isPlainObject(existing) && isPlainObject(value) ? mergeTemplateData(existing, value) : value;
+	}
+
+	return merged;
+};

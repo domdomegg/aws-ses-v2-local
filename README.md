@@ -171,7 +171,7 @@ Using another language or version? Submit a PR to update this list :)
 
 Templates created with `createEmailTemplate` are rendered with [Handlebars](https://handlebarsjs.com/), the same engine AWS SES uses. This supports variables (`{{name}}`), dotted paths (`{{user.name}}`), `{{#each}}`, `{{#if}}`/`{{#unless}}`, and the other built-in helpers. As on real SES, values are **not** HTML-escaped — escape untrusted input yourself before putting it in the template data.
 
-`sendBulkEmail` follows SES's whole-object fallback: `DefaultContent.TemplateData` is used for an entry only when that entry's `ReplacementTemplateData` is empty (`{}`) or absent. Once an entry supplies any replacement data, it is used on its own — the defaults are not merged in per key.
+`sendBulkEmail` merges each entry's `ReplacementTemplateData` into `DefaultContent.TemplateData` per key, matching real SES: replacement keys override the defaults (recursively for nested objects; arrays and scalar values are replaced wholesale), and keys the entry doesn't supply fall back to the default data. An empty (`{}`) or absent `ReplacementTemplateData` therefore uses the defaults unchanged.
 
 #### Missing template variables
 
