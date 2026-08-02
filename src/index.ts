@@ -36,7 +36,11 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 	app.use(express.urlencoded({extended: false, limit: '25mb'}));
 
 	app.get('/', (req, res) => {
-		res.sendFile(path.join(__dirname, '../static/index.html'));
+		// Pass the file relative to a root, rather than as one absolute path. Express 5's send
+		// defaults `dotfiles` to 'ignore', which 404s if _any_ path segment starts with a dot -
+		// and npx/pnpm dlx install us under dot-prefixed cache dirs (.npm/_npx, .pnpm).
+		// With `root` set, the dotfiles check only applies to the path within the root.
+		res.sendFile('index.html', {root: path.join(__dirname, '../static')});
 	});
 
 	app.post('/clear-store', (req, res) => {
