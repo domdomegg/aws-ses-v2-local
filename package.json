@@ -52,7 +52,7 @@
     "express": "^5.2.1",
     "handlebars": "^4.7.9",
     "mailparser": "^3.9.12",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^10.0.9",
     "yargs": "^18.0.0",
     "zod": "^4.4.3"
   }
