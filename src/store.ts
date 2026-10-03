@@ -1,4 +1,4 @@
-import {type MailOptions} from 'nodemailer/lib/sendmail-transport';
+import {type SendMailOptions} from 'nodemailer';
 import {sendEmailToSmtp} from './smtp';
 import z from 'zod';
 
@@ -63,7 +63,7 @@ export const clearStore = () => {
 // and the relatively small project size.
 export const getStoreReadonly = (): Readonly<Store> => store;
 
-export const convertToMailOptions = (email: Email): MailOptions => ({
+export const convertToMailOptions = (email: Email): SendMailOptions => ({
 	from: email.from,
 	replyTo: email.replyTo,
 	to: email.destination.to,
