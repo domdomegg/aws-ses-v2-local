@@ -1,4 +1,4 @@
-import {createTransport, type Transporter} from 'nodemailer';
+import {createTransport} from 'nodemailer';
 import {convertToMailOptions, type Email} from './store';
 
 export type CreateEmlContentResult = {
@@ -8,7 +8,7 @@ export type CreateEmlContentResult = {
 };
 
 export const createEmlContent = async (email: Email): Promise<CreateEmlContentResult> => {
-	const transporter: Transporter = createTransport({
+	const transporter = createTransport({
 		streamTransport: true,
 		buffer: true,
 	});
@@ -17,6 +17,8 @@ export const createEmlContent = async (email: Email): Promise<CreateEmlContentRe
 		transporter.sendMail(convertToMailOptions(email), (error, info) => {
 			if (error) {
 				reject(error);
+			} else if (!Buffer.isBuffer(info.message)) {
+				reject(new Error('Expected nodemailer stream transport to return a Buffer'));
 			} else {
 				resolve({messageId: email.messageId, fileName: email.subject, body: info.message});
 			}
