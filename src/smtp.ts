@@ -38,6 +38,20 @@ export async function sendEmailToSmtp(email: Email): Promise<void> {
 		data.headers = email.headers.map((h) => ({key: h.name, value: h.value}));
 	}
 
+	if (email.raw) {
+		const raw = Buffer.from(email.raw, 'base64');
+		const separator = /(\r?\n)\r?\n/.exec(raw.toString('latin1'));
+		const headerLength = separator === null ? raw.length : separator.index + separator[1]!.length;
+		// Bcc recipients belong in the envelope; preserve the remaining MIME bytes.
+		const headers = raw.subarray(0, headerLength).toString('latin1')
+			.replace(/^Bcc:[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*(?:\r?\n|$)/gim, '');
+		data.raw = Buffer.concat([Buffer.from(headers, 'latin1'), raw.subarray(headerLength)]);
+		data.envelope = {
+			from: email.from,
+			to: [...email.destination.to, ...email.destination.cc, ...email.destination.bcc],
+		};
+	}
+
 	try {
 		await transporter.sendMail(data);
 	} catch (err) {
