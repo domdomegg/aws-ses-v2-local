@@ -9,6 +9,7 @@ export type Store = {
 
 export type Email = {
 	messageId: string;
+	raw?: string | undefined;
 	from: string;
 	replyTo: string[];
 	destination: {
