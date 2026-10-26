@@ -832,3 +832,27 @@ test('rejects a template send whose resolved content lacks a subject or body', a
 		Content: {Template: {TemplateContent: {Subject: 'Hi'}, TemplateData: '{}'}},
 	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
 });
+
+test('rejects a send with an empty destination address', async () => {
+	const ses = new SESv2Client({
+		endpoint: baseURL,
+		region: 'aws-ses-v2-local',
+		credentials: {accessKeyId: 'ANY_STRING', secretAccessKey: 'ANY_STRING'},
+	});
+	const content = {Simple: {Subject: {Data: 'Subject'}, Body: {Text: {Data: 'Body'}}}};
+
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['']},
+		Content: content,
+	}))).rejects.toMatchObject({message: 'Invalid email address .', $metadata: {httpStatusCode: 400}});
+
+	await expect(ses.send(new SendEmailCommand({
+		FromEmailAddress: 'sender@example.com',
+		Destination: {ToAddresses: ['receiver@example.com'], CcAddresses: ['']},
+		Content: content,
+	}))).rejects.toMatchObject({$metadata: {httpStatusCode: 400}});
+
+	const s: Store = (await axios({method: 'get', baseURL, url: '/store'})).data;
+	expect(s.emails).toEqual([]);
+});

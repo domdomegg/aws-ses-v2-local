@@ -77,6 +77,13 @@ const handler: RequestHandler = (req, res, next) => {
 		return;
 	}
 
+	const {Destination} = result.data;
+	const emptyAddress = [...Destination?.ToAddresses ?? [], ...Destination?.CcAddresses ?? [], ...Destination?.BccAddresses ?? []].find((address) => address.trim() === '');
+	if (emptyAddress !== undefined) {
+		res.status(400).send({type: 'BadRequestException', message: `Invalid email address ${emptyAddress}.`});
+		return;
+	}
+
 	if (result.data.Content?.Simple) {
 		handleSimple(req, res, next);
 	} else if (result.data.Content?.Raw) {
