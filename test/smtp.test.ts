@@ -7,6 +7,7 @@ import {simpleParser} from 'mailparser';
 import {SESClient, SendRawEmailCommand} from '@aws-sdk/client-ses';
 import {SESv2Client, SendEmailCommand} from '@aws-sdk/client-sesv2';
 import server from '../src';
+import axios from 'axios';
 import {getAddress} from '../src/address';
 import {clearStore} from '../src/store';
 
@@ -23,7 +24,7 @@ const captureTransport = nodemailer.createTransport<Delivery>({
 	version: '1.0.0',
 	send(mail, callback) {
 		deliveries.push(new Promise((resolve, reject) => {
-			const compiled = mail.message!;
+			const compiled = mail.message;
 			const envelope = compiled.getEnvelope();
 			compiled.build((error, message) => {
 				if (error) {
@@ -168,6 +169,43 @@ for (const version of ['v1', 'v2'] as const) {
 		expect(outgoing.envelope.to).toEqual(['attendee@example.test', 'hidden@example.test']);
 	});
 }
+
+test('v1 Raw uses Source and Destinations as the SMTP envelope when given', async () => {
+	const {raw} = await calendarMessage('REQUEST');
+	await v1.send(new SendRawEmailCommand({
+		RawMessage: {Data: raw},
+		Source: 'bounces@example.test',
+		Destinations: ['attendee@example.test', 'hidden@example.test'],
+	}));
+	const outgoing = await deliveries[0]!;
+
+	expect(outgoing.message.equals(raw)).toBe(true);
+	expect(outgoing.envelope.from).toBe('bounces@example.test');
+	expect(outgoing.envelope.to).toEqual(['attendee@example.test', 'hidden@example.test']);
+});
+
+test('v2 Raw uses FromEmailAddress and Destination as the SMTP envelope when given', async () => {
+	const {raw} = await calendarMessage('REQUEST');
+	await v2.send(new SendEmailCommand({
+		FromEmailAddress: 'bounces@example.test',
+		Destination: {ToAddresses: ['attendee@example.test'], BccAddresses: ['hidden@example.test']},
+		Content: {Raw: {Data: raw}},
+	}));
+	const outgoing = await deliveries[0]!;
+
+	expect(outgoing.message.equals(raw)).toBe(true);
+	expect(outgoing.envelope.from).toBe('bounces@example.test');
+	expect(outgoing.envelope.to).toEqual(['attendee@example.test', 'hidden@example.test']);
+});
+
+test('GET /store does not expose the raw MIME message', async () => {
+	const {raw} = await calendarMessage('REQUEST');
+	await submitRaw('v2', raw);
+
+	const {data} = await axios({method: 'get', baseURL: getAddress(localServer), url: '/store'});
+	expect(data.emails).toHaveLength(1);
+	expect(data.emails[0]).not.toHaveProperty('raw');
+});
 
 test('Simple messages still forward their body, headers and recipients', async () => {
 	await v2.send(new SendEmailCommand({

@@ -49,8 +49,10 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 	});
 
 	app.get('/store', (req, res) => {
-		const {templates: templatesMap, emails} = getStoreReadonly();
+		const {templates: templatesMap, emails: allEmails} = getStoreReadonly();
 		const templates = Object.fromEntries(templatesMap);
+		// Raw MIME duplicates the parsed fields and can be large, so keep it out of responses
+		const emails = allEmails.map((email) => ({...email, raw: undefined}));
 
 		if (!req.query.since) {
 			res.status(200).send({templates, emails});

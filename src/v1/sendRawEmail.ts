@@ -33,9 +33,18 @@ const handler: RequestHandler = async (req, res) => {
 		return;
 	}
 
+	// Schema parsing only keeps the first member, so read all of them from the raw body.
+	const destinations = Object.entries(req.body as Record<string, unknown>)
+		.filter((entry): entry is [string, string] => entry[0].startsWith('Destinations.member.') && typeof entry[1] === 'string')
+		.map(([, address]) => address);
+
 	saveEmail({
 		messageId,
 		raw: result.data['RawMessage.Data'],
+		envelope: {
+			from: result.data.Source,
+			to: destinations.length > 0 ? destinations : undefined,
+		},
 		from,
 		replyTo: message.replyTo ? [message.replyTo.text] : [],
 		destination: {

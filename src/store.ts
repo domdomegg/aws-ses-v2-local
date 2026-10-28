@@ -9,7 +9,10 @@ export type Store = {
 
 export type Email = {
 	messageId: string;
+	// Original base64-encoded MIME message for raw sends, forwarded to SMTP as-is. Not exposed via GET /store.
 	raw?: string | undefined;
+	// SMTP envelope explicitly given via API params (rather than message headers), for raw sends.
+	envelope?: {from?: string | undefined; to?: string[] | undefined} | undefined;
 	from: string;
 	replyTo: string[];
 	destination: {

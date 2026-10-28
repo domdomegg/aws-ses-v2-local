@@ -13,6 +13,34 @@ export async function sendEmailToSmtp(email: Email): Promise<void> {
 		transporter = nodemailer.createTransport(config);
 	}
 
+	const data = email.raw ? rawMailOptions(email, email.raw) : composedMailOptions(email);
+
+	try {
+		await transporter.sendMail(data);
+	} catch (err) {
+		console.error('Failed to send mail to SMTP server', err);
+	}
+}
+
+// Forward the original MIME bytes, so content mailparser doesn't round-trip (e.g. calendar invites) survives.
+function rawMailOptions(email: Email, raw: string): SendMailOptions {
+	const message = Buffer.from(raw, 'base64');
+	const separator = /(\r?\n)\r?\n/.exec(message.toString('latin1'));
+	const headerLength = separator === null ? message.length : separator.index + separator[1]!.length;
+	// Bcc recipients belong in the envelope; preserve the remaining MIME bytes.
+	const headers = message.subarray(0, headerLength).toString('latin1')
+		.replace(/^Bcc:[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*(?:\r?\n|$)/gim, '');
+
+	return {
+		raw: Buffer.concat([Buffer.from(headers, 'latin1'), message.subarray(headerLength)]),
+		envelope: {
+			from: email.envelope?.from ?? email.from,
+			to: email.envelope?.to ?? [...email.destination.to, ...email.destination.cc, ...email.destination.bcc],
+		},
+	};
+}
+
+function composedMailOptions(email: Email): SendMailOptions {
 	const data: SendMailOptions = {
 		messageId: email.messageId,
 		from: email.from,
@@ -38,23 +66,5 @@ export async function sendEmailToSmtp(email: Email): Promise<void> {
 		data.headers = email.headers.map((h) => ({key: h.name, value: h.value}));
 	}
 
-	if (email.raw) {
-		const raw = Buffer.from(email.raw, 'base64');
-		const separator = /(\r?\n)\r?\n/.exec(raw.toString('latin1'));
-		const headerLength = separator === null ? raw.length : separator.index + separator[1]!.length;
-		// Bcc recipients belong in the envelope; preserve the remaining MIME bytes.
-		const headers = raw.subarray(0, headerLength).toString('latin1')
-			.replace(/^Bcc:[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*(?:\r?\n|$)/gim, '');
-		data.raw = Buffer.concat([Buffer.from(headers, 'latin1'), raw.subarray(headerLength)]);
-		data.envelope = {
-			from: email.from,
-			to: [...email.destination.to, ...email.destination.cc, ...email.destination.bcc],
-		};
-	}
-
-	try {
-		await transporter.sendMail(data);
-	} catch (err) {
-		console.error('Failed to send mail to SMTP server', err);
-	}
+	return data;
 }
