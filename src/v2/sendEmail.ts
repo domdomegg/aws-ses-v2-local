@@ -4,6 +4,7 @@ import {saveEmail} from '../store';
 import {z} from 'zod';
 import {charsetDataSchema, emailAddressListSchema, messageHeadersSchema} from '../validation';
 import {getCurrentTimestamp, getMessageId} from '../util';
+import {sendV2Error} from '../errors';
 import {
 	compileTemplateParts, parseTemplateData, resolveTemplateParts, strictTemplateRenderingEnabled, TemplateRenderError,
 } from './renderTemplate';
@@ -73,14 +74,14 @@ const sendEmailSchema = z.object({
 const handler: RequestHandler = (req, res, next) => {
 	const result = sendEmailSchema.safeParse(req.body);
 	if (!result.success) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Schema validation failed');
 		return;
 	}
 
 	const {Destination} = result.data;
 	const emptyAddress = [...Destination?.ToAddresses ?? [], ...Destination?.CcAddresses ?? [], ...Destination?.BccAddresses ?? []].find((address) => address.trim() === '');
 	if (emptyAddress !== undefined) {
-		res.status(400).send({type: 'BadRequestException', message: `Invalid email address ${emptyAddress}.`});
+		sendV2Error(res, 'BadRequestException', `Invalid email address ${emptyAddress}.`);
 		return;
 	}
 
@@ -91,7 +92,7 @@ const handler: RequestHandler = (req, res, next) => {
 	} else if (result.data.Content?.Template) {
 		handleTemplate(req, res, next);
 	} else {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have either Simple or Raw content. Want to add support for other types of emails? Open a PR!'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Must have either Simple or Raw content. Want to add support for other types of emails? Open a PR!');
 	}
 };
 
@@ -112,17 +113,17 @@ const transformAttachments = (attachments?: Attachment[]) => {
 const handleSimple: RequestHandler = async (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
 	if (!data.Content?.Simple?.Body?.Html?.Data && !data.Content?.Simple?.Body?.Text?.Data) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Simple content must have either a HTML or Text body.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Simple content must have either a HTML or Text body.');
 		return;
 	}
 
 	if (!data.Content?.Simple?.Subject?.Data) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Simple content must have a subject.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Simple content must have a subject.');
 		return;
 	}
 
 	if (!data.FromEmailAddress) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a from email address.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Must have a from email address.');
 		return;
 	}
 
@@ -155,14 +156,14 @@ const handleSimple: RequestHandler = async (req, res) => {
 const handleRaw: RequestHandler = async (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
 	if (!data.Content?.Raw?.Data) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have data.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Raw content must have data.');
 		return;
 	}
 
 	const message = await simpleParser(Buffer.from(data.Content.Raw.Data, 'base64'));
 
 	if (!message.from?.text) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Raw content must have a from address.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Raw content must have a from address.');
 		return;
 	}
 
@@ -198,12 +199,12 @@ const handleRaw: RequestHandler = async (req, res) => {
 const handleTemplate: RequestHandler = (req, res) => {
 	const data = sendEmailSchema.parse(req.body);
 	if (!data.Content?.Template) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have data.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Template content must have data.');
 		return;
 	}
 
 	if (!data.FromEmailAddress) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a from email address.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Must have a from email address.');
 		return;
 	}
 
@@ -214,11 +215,11 @@ const handleTemplate: RequestHandler = (req, res) => {
 	const resolved = resolveTemplateParts({TemplateName, TemplateArn, TemplateContent});
 	if ('error' in resolved) {
 		if (resolved.error === 'not-found') {
-			res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+			sendV2Error(res, 'NotFoundException', 'The resource you attempted to access doesn\'t exist.');
 		} else if (resolved.error === 'invalid-arn') {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid template ARN.'});
+			sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Invalid template ARN.');
 		} else {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.'});
+			sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Template content must have a template name, template ARN, or inline template content.');
 		}
 
 		return;
@@ -226,13 +227,13 @@ const handleTemplate: RequestHandler = (req, res) => {
 
 	const templateParts = resolved.parts;
 	if (!templateParts.Subject || (!templateParts.Html && !templateParts.Text)) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a subject and either an HTML or text body in the template.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Must provide a subject and either an HTML or text body in the template.');
 		return;
 	}
 
 	const templateData = parseTemplateData(TemplateData);
 	if (templateData instanceof Error) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: ${templateData.message}`});
+		sendV2Error(res, 'BadRequestException', `aws-ses-v2-local: ${templateData.message}`);
 		return;
 	}
 
@@ -243,7 +244,7 @@ const handleTemplate: RequestHandler = (req, res) => {
 		({subject, html: htmlBody, text: textBody} = compileTemplateParts(templateParts, {strict: strictTemplateRenderingEnabled()})(templateData));
 	} catch (error: unknown) {
 		if (error instanceof TemplateRenderError) {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
+			sendV2Error(res, 'BadRequestException', `aws-ses-v2-local: template rendering failed - ${error.message}`);
 			return;
 		}
 

@@ -1,5 +1,6 @@
 import type {RequestHandler} from 'express';
 import {z} from 'zod';
+import {sendV2Error} from '../errors';
 
 const accountSchema = z.object({
 	DedicatedIpAutoWarmupEnabled: z.boolean(),
@@ -29,14 +30,14 @@ const accountSchema = z.object({
 
 const handler: RequestHandler = (req, res) => {
 	if (!process.env.AWS_SES_ACCOUNT) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Account not found'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Account not found');
 		return;
 	}
 
 	const account = JSON.parse(process.env.AWS_SES_ACCOUNT);
 	const result = accountSchema.safeParse(account);
 	if (!result.success) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Schema validation failed');
 		return;
 	}
 

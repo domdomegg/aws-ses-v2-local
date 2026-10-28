@@ -3,6 +3,7 @@ import {type AddressObject, simpleParser} from 'mailparser';
 import {saveEmail} from '../store';
 import {z} from 'zod';
 import {getCurrentTimestamp, getMessageId} from '../util';
+import {sendV1Error} from '../errors';
 
 const sendRawEmailSchema = z.object({
 	Action: z.literal('SendRawEmail'),
@@ -20,7 +21,7 @@ const sendRawEmailSchema = z.object({
 const handler: RequestHandler = async (req, res) => {
 	const result = sendRawEmailSchema.safeParse(req.body);
 	if (!result.success) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+		sendV1Error(res, 'ValidationError', 'aws-ses-v2-local: Schema validation failed');
 		return;
 	}
 
@@ -29,7 +30,7 @@ const handler: RequestHandler = async (req, res) => {
 	const message = await simpleParser(Buffer.from(result.data['RawMessage.Data'], 'base64'));
 	const from = message.from?.text ?? result.data.Source;
 	if (!from) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Missing source or from value'});
+		sendV1Error(res, 'InvalidParameterValue', 'aws-ses-v2-local: Missing source or from value');
 		return;
 	}
 

@@ -1,6 +1,7 @@
 import type {RequestHandler} from 'express';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import {z} from 'zod';
+import {sendV2Error} from '../errors';
 import {
 	compileTemplateParts, parseTemplateData, TemplateRenderError,
 } from './renderTemplate';
@@ -30,13 +31,13 @@ const handler: RequestHandler = async (req, res) => {
 
 	const result = testRenderSchema.safeParse(req.body);
 	if (!result.success) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide TemplateData.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Must provide TemplateData.');
 		return;
 	}
 
 	const templateData = parseTemplateData(result.data.TemplateData);
 	if (templateData instanceof Error) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: ${templateData.message}`});
+		sendV2Error(res, 'BadRequestException', `aws-ses-v2-local: ${templateData.message}`);
 		return;
 	}
 
@@ -53,7 +54,7 @@ const handler: RequestHandler = async (req, res) => {
 			throw error;
 		}
 
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: template rendering failed - ${error.message}`});
+		sendV2Error(res, 'BadRequestException', `aws-ses-v2-local: template rendering failed - ${error.message}`);
 		return;
 	}
 

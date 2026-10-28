@@ -2,6 +2,7 @@ import type {RequestHandler} from 'express';
 import {saveEmail} from '../store';
 import {z} from 'zod';
 import {getCurrentTimestamp, getMessageId} from '../util';
+import {sendV1Error} from '../errors';
 
 const sendEmailSchema = z.object({
 	Action: z.literal('SendEmail'),
@@ -27,17 +28,17 @@ const sendEmailSchema = z.object({
 const handler: RequestHandler = async (req, res) => {
 	const result = sendEmailSchema.safeParse(req.body);
 	if (!result.success) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+		sendV1Error(res, 'ValidationError', 'aws-ses-v2-local: Schema validation failed');
 		return;
 	}
 
 	if (!result.data['Message.Body.Text.Data'] && !result.data['Message.Body.Html.Data']) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have either a HTML or Text body.'});
+		sendV1Error(res, 'InvalidParameterValue', 'aws-ses-v2-local: Must have either a HTML or Text body.');
 		return;
 	}
 
 	if (!result.data['Message.Subject.Data']) {
-		res.status(400).send({message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must have a subject.'});
+		sendV1Error(res, 'InvalidParameterValue', 'aws-ses-v2-local: Must have a subject.');
 		return;
 	}
 

@@ -1,5 +1,6 @@
 import type {RequestHandler} from 'express';
 import {getStoreReadonly, type Template} from '../store';
+import {sendV2Error} from '../errors';
 
 const MOCKED_NEXT_TOKEN_PREFIX = 'aws-ses-v2-local-mocked-';
 
@@ -12,7 +13,7 @@ const handler: RequestHandler = (req, res) => {
 	if (nextToken) {
 		const startIndex = templateItems.findIndex(([name]) => `${MOCKED_NEXT_TOKEN_PREFIX}${name}` === nextToken);
 		if (startIndex === -1) {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Invalid NextToken.'});
+			sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Invalid NextToken.');
 			return;
 		}
 
@@ -20,9 +21,7 @@ const handler: RequestHandler = (req, res) => {
 	}
 
 	if (Number.isNaN(pageSize) || pageSize < 1 || pageSize > 100) {
-		res.status(400).send({
-			type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: PageSize must be between 1 and 100',
-		});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: PageSize must be between 1 and 100');
 		return;
 	}
 
