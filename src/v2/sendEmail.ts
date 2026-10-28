@@ -167,11 +167,16 @@ const handleRaw: RequestHandler = async (req, res) => {
 	}
 
 	const messageId = getMessageId();
+	const envelopeTo = [...data.Destination?.ToAddresses ?? [], ...data.Destination?.CcAddresses ?? [], ...data.Destination?.BccAddresses ?? []];
 
 	saveEmail({
 		messageId,
 		from: message.from?.text,
 		raw: data.Content.Raw.Data,
+		envelope: {
+			from: data.FromEmailAddress,
+			to: envelopeTo.length > 0 ? envelopeTo : undefined,
+		},
 		replyTo: message.replyTo ? [message.replyTo.text] : [],
 		destination: {
 			to: (Array.isArray(message.to) ? message.to : [message.to || null]).filter((m): m is AddressObject => Boolean(m)).map((a) => a.text),
