@@ -1,6 +1,7 @@
 import type {RequestHandler} from 'express';
 import {setTemplate, templateSchema} from '../store';
 import {compileTemplateOrReject, requireTemplate} from './templateRequest';
+import {sendV2Error} from '../errors';
 
 const handler: RequestHandler = (req, res) => {
 	const existing = requireTemplate(req, res);
@@ -11,7 +12,7 @@ const handler: RequestHandler = (req, res) => {
 	// TemplateName comes from the URL; the CreatedTimestamp is preserved from the existing template.
 	const result = templateSchema.safeParse({...req.body, TemplateName: existing.TemplateName, CreatedTimestamp: existing.CreatedTimestamp});
 	if (!result.success) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Schema validation failed'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Schema validation failed');
 		return;
 	}
 

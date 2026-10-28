@@ -14,6 +14,7 @@ import v2SendEmail from './v2/sendEmail';
 import v2SendBulkEmail from './v2/sendBulkEmail';
 import {getStoreReadonly, clearStore} from './store';
 import {createEmlContent} from './emlFile';
+import {sendV1Error, sendV2Error} from './errors';
 
 export type Config = {
 	host: string;
@@ -114,17 +115,17 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 	app.post('/', (req, res, next) => {
 		if (req.body.Action === 'SendEmail') {
 			v1SendEmail(req, res, next);
-		}
-
-		if (req.body.Action === 'SendRawEmail') {
+		} else if (req.body.Action === 'SendRawEmail') {
 			v1SendRawEmail(req, res, next);
+		} else {
+			sendV1Error(res, 'InvalidAction', `aws-ses-v2-local: Unsupported action ${String(req.body.Action)}. Want to add support? Open a PR!`);
 		}
 	});
 
 	// SES V2 - template handling.
 	app.get('/v2/email/templates', (req, res, next) => {
 		if (req.path.endsWith('/')) {
-			res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a template name.'});
+			sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Must provide a template name.');
 			return;
 		}
 
@@ -144,7 +145,7 @@ const server = async (partialConfig: Partial<Config> = {}): Promise<Server> => {
 	app.post('/v2/email/outbound-bulk-emails', v2SendBulkEmail);
 
 	app.use((req, res) => {
-		res.status(404).send('<UnknownOperationException/>');
+		sendV2Error(res, 'UnknownOperationException', `aws-ses-v2-local: Unsupported operation ${req.method} ${req.path}. Want to add support? Open a PR!`);
 	});
 
 	return new Promise((resolve) => {

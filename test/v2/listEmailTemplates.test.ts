@@ -290,11 +290,8 @@ describe('ListEmailTemplates - Error cases', () => {
 		})).rejects.toMatchObject({
 			response: {
 				status: 400,
-				data: {
-					type: 'BadRequestException',
-					message: 'Bad Request Exception',
-					detail: 'aws-ses-v2-local: PageSize must be between 1 and 100',
-				},
+				headers: {'x-amzn-errortype': 'BadRequestException'},
+				data: {message: 'aws-ses-v2-local: PageSize must be between 1 and 100'},
 			},
 		});
 	});
@@ -313,11 +310,8 @@ describe('ListEmailTemplates - Error cases', () => {
 		})).rejects.toMatchObject({
 			response: {
 				status: 400,
-				data: {
-					type: 'BadRequestException',
-					message: 'Bad Request Exception',
-					detail: 'aws-ses-v2-local: PageSize must be between 1 and 100',
-				},
+				headers: {'x-amzn-errortype': 'BadRequestException'},
+				data: {message: 'aws-ses-v2-local: PageSize must be between 1 and 100'},
 			},
 		});
 	});
@@ -336,11 +330,8 @@ describe('ListEmailTemplates - Error cases', () => {
 		})).rejects.toMatchObject({
 			response: {
 				status: 400,
-				data: {
-					type: 'BadRequestException',
-					message: 'Bad Request Exception',
-					detail: 'aws-ses-v2-local: Invalid NextToken.',
-				},
+				headers: {'x-amzn-errortype': 'BadRequestException'},
+				data: {message: 'aws-ses-v2-local: Invalid NextToken.'},
 			},
 		});
 	});
@@ -359,11 +350,8 @@ describe('ListEmailTemplates - Error cases', () => {
 		})).rejects.toMatchObject({
 			response: {
 				status: 400,
-				data: {
-					type: 'BadRequestException',
-					message: 'Bad Request Exception',
-					detail: 'aws-ses-v2-local: Invalid NextToken.',
-				},
+				headers: {'x-amzn-errortype': 'BadRequestException'},
+				data: {message: 'aws-ses-v2-local: Invalid NextToken.'},
 			},
 		});
 	});
@@ -382,11 +370,8 @@ describe('ListEmailTemplates - Error cases', () => {
 		})).rejects.toMatchObject({
 			response: {
 				status: 400,
-				data: {
-					type: 'BadRequestException',
-					message: 'Bad Request Exception',
-					detail: 'aws-ses-v2-local: Invalid NextToken.',
-				},
+				headers: {'x-amzn-errortype': 'BadRequestException'},
+				data: {message: 'aws-ses-v2-local: Invalid NextToken.'},
 			},
 		});
 	});

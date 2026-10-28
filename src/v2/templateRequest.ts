@@ -1,6 +1,7 @@
 import type {Request, Response} from 'express';
 import {getTemplate, type Template} from '../store';
 import {compileTemplateParts, TemplateRenderError, type TemplateParts} from './renderTemplate';
+import {sendV2Error} from '../errors';
 
 // Express 5 types route params as string | string[]; our template routes have a single segment.
 export const getTemplateNameParam = (req: Request): string | undefined => {
@@ -13,13 +14,13 @@ export const getTemplateNameParam = (req: Request): string | undefined => {
 export const requireTemplate = (req: Request, res: Response): Template | undefined => {
 	const templateName = getTemplateNameParam(req);
 	if (!templateName) {
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: 'aws-ses-v2-local: Must provide a template name.'});
+		sendV2Error(res, 'BadRequestException', 'aws-ses-v2-local: Must provide a template name.');
 		return undefined;
 	}
 
 	const template = getTemplate(templateName);
 	if (!template) {
-		res.status(404).send({type: 'NotFoundException', message: 'The resource you attempted to access doesn\'t exist.'});
+		sendV2Error(res, 'NotFoundException', 'The resource you attempted to access doesn\'t exist.');
 		return undefined;
 	}
 
@@ -37,7 +38,7 @@ export const compileTemplateOrReject = (content: TemplateParts, res: Response): 
 			throw error;
 		}
 
-		res.status(400).send({type: 'BadRequestException', message: 'Bad Request Exception', detail: `aws-ses-v2-local: Handlebars compilation failed - ${error.message}`});
+		sendV2Error(res, 'BadRequestException', `aws-ses-v2-local: Handlebars compilation failed - ${error.message}`);
 		return false;
 	}
 };
