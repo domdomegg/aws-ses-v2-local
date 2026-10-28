@@ -35,6 +35,7 @@ const handler: RequestHandler = async (req, res) => {
 
 	saveEmail({
 		messageId,
+		raw: result.data['RawMessage.Data'],
 		from,
 		replyTo: message.replyTo ? [message.replyTo.text] : [],
 		destination: {

@@ -171,6 +171,7 @@ const handleRaw: RequestHandler = async (req, res) => {
 	saveEmail({
 		messageId,
 		from: message.from?.text,
+		raw: data.Content.Raw.Data,
 		replyTo: message.replyTo ? [message.replyTo.text] : [],
 		destination: {
 			to: (Array.isArray(message.to) ? message.to : [message.to || null]).filter((m): m is AddressObject => Boolean(m)).map((a) => a.text),
